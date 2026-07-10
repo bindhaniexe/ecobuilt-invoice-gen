@@ -2,9 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { FileText, LayoutDashboard, Menu, Users } from "lucide-react";
-import type { ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { FileText, LayoutDashboard, LogOut, Menu, Users } from "lucide-react";
+import { type ReactNode, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,24 @@ const navItems = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  // Don't render the app shell on the login page
+  if (pathname === "/login") {
+    return <>{children}</>;
+  }
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      router.push("/login");
+      router.refresh();
+    } catch {
+      setLoggingOut(false);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-canvas text-body">
@@ -60,6 +78,17 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <FileText className="h-4 w-4" aria-hidden="true" />
                 New invoice
               </Link>
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Sign out"
+              type="button"
+              onClick={handleLogout}
+              disabled={loggingOut}
+              title="Sign out"
+            >
+              <LogOut className="h-4 w-4" aria-hidden="true" />
             </Button>
             <Button
               className="md:hidden"
