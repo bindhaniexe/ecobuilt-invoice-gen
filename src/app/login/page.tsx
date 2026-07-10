@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Lock, Eye, EyeOff, ArrowRight, AlertCircle } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,6 +11,11 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -39,8 +44,12 @@ export default function LoginPage() {
     }
   }
 
+  if (!mounted) {
+    return <div className="login-page" suppressHydrationWarning />;
+  }
+
   return (
-    <div className="login-page">
+    <div className="login-page" suppressHydrationWarning>
       {/* Decorative background */}
       <div className="login-bg-pattern" aria-hidden="true">
         <div className="login-bg-circle login-bg-circle--1" />

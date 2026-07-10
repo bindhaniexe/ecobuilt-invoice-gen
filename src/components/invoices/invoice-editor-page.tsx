@@ -566,25 +566,6 @@ function SectionHeading({ title }: { title: string }) {
   return <h2 className="mb-5 text-lg font-semibold text-ink">{title}</h2>;
 }
 
-function DetailsSection({
-  title,
-  details,
-  onChange,
-  includeWebsite = false,
-}: {
-  title: string;
-  details: CompanyDetails;
-  onChange(details: CompanyDetails): void;
-  includeWebsite?: boolean;
-}) {
-  return (
-    <section className="section-panel p-5 md:p-6">
-      <SectionHeading title={title} />
-      <DetailsFields details={details} onChange={onChange} includeWebsite={includeWebsite} />
-    </section>
-  );
-}
-
 function DetailsFields<TDetails extends CustomerDetails | CompanyDetails>({
   details,
   onChange,
