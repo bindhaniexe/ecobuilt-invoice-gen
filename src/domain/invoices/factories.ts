@@ -11,12 +11,20 @@ import type {
 } from "./types";
 
 export const defaultCompany: CompanyDetails = {
-  name: "Your Company Name",
-  address: "Company address, city, state, PIN",
-  gstNumber: "27ABCDE1234F1Z5",
-  phone: "+91 98765 43210",
-  email: "billing@example.com",
-  website: "www.example.com",
+  name: "OMM ECO BUILDTECH",
+  address: "Ramdaspur Industrial Estate, Office - Trisulia, Dist - Cuttack, State - Odisha, 754005",
+  gstNumber: "21AAGF03736M1Z6",
+  phone: "+91 70777 03202",
+  email: "info@ommecobuildtech.in",
+  website: "www.ommecobuildtech.in",
+};
+
+export const OMM_BANK_DETAILS = {
+  bankName: "BANK OF INDIA",
+  accountName: "OMM ECO BUILDTECH",
+  accountNumber: "511230110000191",
+  ifscCode: "BKID0005112",
+  branch: "Kharvel Nagar, Bhubaneswar",
 };
 
 export const emptyCustomer: CustomerDetails = {

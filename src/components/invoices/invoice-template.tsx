@@ -1,6 +1,7 @@
 import type { RefObject } from "react";
 
 import type { Invoice, InvoiceItem } from "@/domain/invoices/types";
+import { defaultCompany, OMM_BANK_DETAILS } from "@/domain/invoices/factories";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 const FIRST_PAGE_LIMIT = 8;
@@ -78,10 +79,10 @@ export function InvoiceTemplate({
             />
             <div>
               <h2 className="max-w-[100mm] text-[22px] font-semibold leading-tight text-ink">
-                {invoice.company.name}
+                {defaultCompany.name}
               </h2>
               <p className="mt-2 max-w-[85mm] whitespace-pre-line text-[11px] leading-5 text-muted">
-                {invoice.company.address}
+                {defaultCompany.address}
               </p>
             </div>
           </div>
@@ -118,8 +119,8 @@ export function InvoiceTemplate({
             <PreviewMeta label="Payment status" value={invoice.paymentStatus} />
             <PreviewMeta label="Payment method" value={invoice.paymentMethod} />
             <PreviewMeta label="Balance due" value={formatCurrency(invoice.totals.balanceDue)} />
-            <PreviewMeta label="Company GST" value={invoice.company.gstNumber || "-"} />
-            <PreviewMeta label="Company phone" value={invoice.company.phone || "-"} />
+            <PreviewMeta label="Company GST" value={defaultCompany.gstNumber || "-"} />
+            <PreviewMeta label="Company phone" value={defaultCompany.phone || "-"} />
           </div>
         </section>
 
@@ -175,6 +176,23 @@ export function InvoiceTemplate({
               </p>
 
               <div className="mt-6 grid gap-5">
+                <div className="rounded-md border border-hairline bg-surface-soft p-3">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-muted">
+                    Bank Account Details
+                  </p>
+                  <div className="mt-2 text-[10px] leading-relaxed text-body grid grid-cols-[100px_1fr] gap-x-2 gap-y-0.5">
+                    <span className="font-semibold text-muted">Bank Name:</span>
+                    <span className="font-medium text-ink">{OMM_BANK_DETAILS.bankName}</span>
+                    <span className="font-semibold text-muted">Account Name:</span>
+                    <span className="font-medium text-ink">{OMM_BANK_DETAILS.accountName}</span>
+                    <span className="font-semibold text-muted">Account No:</span>
+                    <span className="font-bold text-ink">{OMM_BANK_DETAILS.accountNumber}</span>
+                    <span className="font-semibold text-muted">IFSC Code:</span>
+                    <span className="font-bold text-ink">{OMM_BANK_DETAILS.ifscCode}</span>
+                    <span className="font-semibold text-muted">Branch:</span>
+                    <span className="font-medium text-ink">{OMM_BANK_DETAILS.branch}</span>
+                  </div>
+                </div>
                 <PreviewTextBlock label="Terms and conditions" value={invoice.terms} />
                 <PreviewTextBlock label="Notes" value={invoice.notes} />
               </div>
@@ -207,7 +225,7 @@ export function InvoiceTemplate({
                 </div>
                 <div className="ml-auto mt-8 h-px w-40 bg-ink" />
                 <p className="mt-2 text-[11px] font-semibold text-ink">
-                  {invoice.signature || invoice.company.name}
+                  {invoice.signature || defaultCompany.name}
                 </p>
                 <p className="text-[10px] text-muted">Authorized signature</p>
               </div>

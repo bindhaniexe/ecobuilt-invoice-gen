@@ -16,6 +16,8 @@ import {
   createInvoiceDraft,
   createInvoiceItem,
   recalculateInvoice,
+  defaultCompany,
+  OMM_BANK_DETAILS,
 } from "@/domain/invoices/factories";
 import { invoiceSchema } from "@/domain/invoices/schemas";
 import type {
@@ -77,7 +79,16 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
       try {
         if (invoiceId) {
           const existing = await activeRepository.getById(invoiceId);
-          if (!cancelled) setInvoice(existing);
+          if (!cancelled) {
+            setInvoice(
+              existing
+                ? {
+                    ...existing,
+                    company: defaultCompany,
+                  }
+                : null,
+            );
+          }
         } else {
           const existingNumbers = (await activeRepository.list()).map(
             (record) => record.invoiceNumber,
@@ -108,7 +119,10 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
   async function handleSave() {
     if (!invoiceRepository || !invoice) return;
 
-    const normalized = recalculateInvoice(invoice);
+    const normalized = recalculateInvoice({
+      ...invoice,
+      company: defaultCompany,
+    });
     const parsed = invoiceSchema.safeParse(normalized);
 
     if (!parsed.success) {
@@ -322,21 +336,66 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
             </div>
           </section>
 
-          <DetailsSection
-            title="Company details"
-            details={invoice.company}
-            onChange={(company) =>
-              updateInvoice((current) => ({
-                ...current,
-                company,
-                signature:
-                  current.signature === current.company.name
-                    ? company.name
-                    : current.signature,
-              }))
-            }
-            includeWebsite
-          />
+          <section className="section-panel p-5 md:p-6 bg-surface-soft/30">
+            <div className="flex items-center justify-between mb-4 pb-2 border-b border-hairline">
+              <h2 className="text-lg font-semibold text-ink">Company Details (Hardcoded)</h2>
+              <span className="text-[11px] font-semibold bg-[#edf7ed] text-[#245536] border border-[#b7e4c7] px-2 py-0.5 rounded-full uppercase tracking-wider">
+                Locked
+              </span>
+            </div>
+            
+            <div className="grid gap-4 md:grid-cols-2 text-sm">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-muted">Company Name</p>
+                <p className="mt-1 font-semibold text-ink">{defaultCompany.name}</p>
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-muted">GST Number</p>
+                <p className="mt-1 font-mono font-semibold text-ink">{defaultCompany.gstNumber}</p>
+              </div>
+              <div className="md:col-span-2">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted">Address</p>
+                <p className="mt-1 text-ink">{defaultCompany.address}</p>
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-muted">Phone</p>
+                <p className="mt-1 text-ink">{defaultCompany.phone}</p>
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-muted">Email</p>
+                <p className="mt-1 text-ink">{defaultCompany.email}</p>
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-muted">Website</p>
+                <p className="mt-1 text-ink">{defaultCompany.website}</p>
+              </div>
+              <div className="md:col-span-2 mt-2 pt-3 border-t border-hairline-soft">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted mb-2">Hardcoded Bank Account Details</p>
+                <div className="grid gap-2 grid-cols-2 md:grid-cols-3 bg-white p-3 rounded border border-hairline">
+                  <div>
+                    <span className="text-xs text-muted block">Bank Name</span>
+                    <span className="font-semibold text-ink text-xs">{OMM_BANK_DETAILS.bankName}</span>
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted block">Account Name</span>
+                    <span className="font-semibold text-ink text-xs">{OMM_BANK_DETAILS.accountName}</span>
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted block">Account Number</span>
+                    <span className="font-bold text-ink text-xs">{OMM_BANK_DETAILS.accountNumber}</span>
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted block">IFSC Code</span>
+                    <span className="font-bold text-ink text-xs">{OMM_BANK_DETAILS.ifscCode}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-xs text-muted block">Branch</span>
+                    <span className="font-semibold text-ink text-xs">{OMM_BANK_DETAILS.branch}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
 
           <section className="section-panel p-5 md:p-6">
             <SectionHeading title="Customer details" />

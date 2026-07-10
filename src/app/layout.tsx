@@ -5,8 +5,8 @@ import { AppShell } from "@/components/layout/app-shell";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Invoice Generator",
-  description: "A local-first invoice generator with A4 PDF export.",
+  title: "OMM ECO BUILDTECH - Invoice System",
+  description: "Dedicated invoice system for OMM ECO BUILDTECH.",
 };
 
 export default function RootLayout({

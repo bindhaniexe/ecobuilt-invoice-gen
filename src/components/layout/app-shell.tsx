@@ -30,7 +30,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               className="rounded-md"
               priority
             />
-            <span className="text-base font-semibold">Invoice Gen</span>
+            <span className="text-base font-semibold">OMM ECO BUILDTECH</span>
           </Link>
 
           <nav className="hidden items-center gap-2 md:flex" aria-label="Primary">
