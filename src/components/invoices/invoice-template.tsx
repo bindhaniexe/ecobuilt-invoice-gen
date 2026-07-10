@@ -87,7 +87,9 @@ export function InvoiceTemplate({
             </div>
           </div>
           <div className="text-right">
-            <h1 className="text-[28px] font-bold leading-none text-ink">Invoice</h1>
+            <h1 className="text-[28px] font-bold leading-none text-ink">
+              {invoice.invoiceType === "proforma" ? "Proforma Invoice" : "Tax Invoice"}
+            </h1>
             <p
               className="mt-3 px-4 py-2 text-[12px] font-semibold text-ink"
               style={{ backgroundColor: "#f7f7f7", borderRadius: "9999px" }}

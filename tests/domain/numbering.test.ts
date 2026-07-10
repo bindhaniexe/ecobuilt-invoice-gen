@@ -18,4 +18,18 @@ describe("generateInvoiceNumber", () => {
       "INV-2026-27-0001",
     );
   });
+
+  it("uses the PI prefix for proforma invoices and handles sequence independently", () => {
+    const number = generateInvoiceNumber(
+      new Date("2026-07-10"),
+      [
+        "INV-2026-27-0005",
+        "PI-2026-27-0001",
+        "PI-2026-27-0002",
+      ],
+      "proforma",
+    );
+
+    expect(number).toBe("PI-2026-27-0003");
+  });
 });

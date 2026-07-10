@@ -6,6 +6,7 @@ import type {
   Invoice,
   InvoiceItem,
   InvoiceItemInput,
+  InvoiceType,
   PaymentMethod,
   PaymentStatus,
 } from "./types";
@@ -60,7 +61,10 @@ export function createInvoiceItem(
   };
 }
 
-export function createInvoiceDraft(existingInvoiceNumbers: string[]): Invoice {
+export function createInvoiceDraft(
+  existingInvoiceNumbers: string[],
+  type: InvoiceType = "tax-invoice",
+): Invoice {
   const now = new Date().toISOString();
   const issueDate = now.slice(0, 10);
   const items = [createInvoiceItem({ description: "Service description" })];
@@ -68,7 +72,8 @@ export function createInvoiceDraft(existingInvoiceNumbers: string[]): Invoice {
 
   return {
     id: createId("inv"),
-    invoiceNumber: generateInvoiceNumber(new Date(issueDate), existingInvoiceNumbers),
+    invoiceNumber: generateInvoiceNumber(new Date(issueDate), existingInvoiceNumbers, type),
+    invoiceType: type,
     issueDate,
     paymentMethod: "bank-transfer" satisfies PaymentMethod,
     paymentStatus: "pending" satisfies PaymentStatus,

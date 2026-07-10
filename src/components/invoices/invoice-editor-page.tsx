@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
+  AlertCircle,
   ArrowLeft,
   Download,
   FileCheck,
@@ -19,11 +20,13 @@ import {
   defaultCompany,
   OMM_BANK_DETAILS,
 } from "@/domain/invoices/factories";
+import { generateInvoiceNumber } from "@/domain/invoices/numbering";
 import { invoiceSchema } from "@/domain/invoices/schemas";
 import type {
   CompanyDetails,
   CustomerDetails,
   Invoice,
+  InvoiceType,
   PaymentMethod,
   PaymentStatus,
 } from "@/domain/invoices/types";
@@ -60,6 +63,7 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
   const { repository: invoiceRepository } = useInvoices();
   const { customers } = useCustomers();
   const [invoice, setInvoice] = useState<Invoice | null>(null);
+  const [existingInvoiceNumbers, setExistingInvoiceNumbers] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -77,23 +81,27 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
       setFormError("");
 
       try {
+        const allInvoices = await activeRepository.list();
+        const existing = allInvoices.map((record) => record.invoiceNumber);
+        if (!cancelled) setExistingInvoiceNumbers(existing);
+
         if (invoiceId) {
-          const existing = await activeRepository.getById(invoiceId);
+          const existingInvoice = allInvoices.find((record) => record.id === invoiceId);
           if (!cancelled) {
             setInvoice(
-              existing
+              existingInvoice
                 ? {
-                    ...existing,
+                    ...existingInvoice,
                     company: defaultCompany,
                   }
                 : null,
             );
           }
         } else {
-          const existingNumbers = (await activeRepository.list()).map(
-            (record) => record.invoiceNumber,
-          );
-          if (!cancelled) setInvoice(createInvoiceDraft(existingNumbers));
+          const typeParam = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("type") === "proforma"
+            ? "proforma"
+            : "tax-invoice";
+          if (!cancelled) setInvoice(createInvoiceDraft(existing, typeParam));
         }
       } catch (error) {
         if (!cancelled) {
@@ -212,6 +220,31 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
+              {invoice.invoiceType === "proforma" && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    updateInvoice((current) => {
+                      const nextType = "tax-invoice";
+                      const generatedNum = generateInvoiceNumber(
+                        new Date(current.issueDate),
+                        existingInvoiceNumbers,
+                        nextType
+                      );
+                      return {
+                        ...current,
+                        invoiceType: nextType,
+                        invoiceNumber: generatedNum,
+                      };
+                    });
+                    setMessage("Converted to Tax Invoice. Save to persist changes.");
+                  }}
+                >
+                  <FileCheck className="h-4 w-4" aria-hidden="true" />
+                  Convert to Tax Invoice
+                </Button>
+              )}
               <Button type="button" variant="secondary" onClick={() => window.print()}>
                 <Printer className="h-4 w-4" aria-hidden="true" />
                 Print
@@ -244,6 +277,40 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
             {message}
           </div>
         ) : null}
+        {invoice.invoiceType === "proforma" && (
+          <div className="mt-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 rounded-md border border-[#fbbf24] bg-[#fffbeb] p-4 text-sm text-[#92400e]">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-[#d97706] shrink-0" aria-hidden="true" />
+              <span>
+                This is a <strong>Proforma Invoice</strong> (Quote/Estimate). It uses prefix <code>PI-</code>, does not increment official tax sequence numbers, and is excluded from actual revenue dashboard analytics.
+              </span>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="min-h-9 h-9 px-3 shrink-0"
+              onClick={() => {
+                updateInvoice((current) => {
+                  const nextType = "tax-invoice";
+                  const generatedNum = generateInvoiceNumber(
+                    new Date(current.issueDate),
+                    existingInvoiceNumbers,
+                    nextType
+                  );
+                  return {
+                    ...current,
+                    invoiceType: nextType,
+                    invoiceNumber: generatedNum,
+                  };
+                });
+                setMessage("Converted to Tax Invoice. Save to persist changes.");
+              }}
+            >
+              Convert to Tax Invoice
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="app-section flex flex-col gap-6">
@@ -251,6 +318,30 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
           <section className="section-panel p-5 md:p-6">
             <SectionHeading title="Invoice details" />
             <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Invoice type" htmlFor="invoice-type">
+                <Select
+                  id="invoice-type"
+                  value={invoice.invoiceType}
+                  onChange={(event) => {
+                    const nextType = event.target.value as InvoiceType;
+                    updateInvoice((current) => {
+                      const generatedNum = generateInvoiceNumber(
+                        new Date(current.issueDate),
+                        existingInvoiceNumbers,
+                        nextType
+                      );
+                      return {
+                        ...current,
+                        invoiceType: nextType,
+                        invoiceNumber: generatedNum,
+                      };
+                    });
+                  }}
+                >
+                  <option value="tax-invoice">Tax Invoice</option>
+                  <option value="proforma">Proforma Invoice</option>
+                </Select>
+              </Field>
               <Field label="Invoice number" htmlFor="invoice-number">
                 <Input
                   id="invoice-number"

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import type { Customer, Invoice } from "./types";
+
 export const paymentStatusSchema = z.enum(["draft", "pending", "paid", "overdue"]);
 export const paymentMethodSchema = z.enum([
   "cash",
@@ -55,9 +57,12 @@ export const invoiceTotalsSchema = z.object({
   amountInWords: z.string(),
 });
 
+export const invoiceTypeSchema = z.enum(["tax-invoice", "proforma"]);
+
 export const invoiceSchema = z.object({
   id: z.string().min(1),
   invoiceNumber: z.string().min(1, "Invoice number is required"),
+  invoiceType: invoiceTypeSchema.default("tax-invoice"),
   issueDate: z.string().min(1, "Invoice date is required"),
   paymentMethod: paymentMethodSchema,
   paymentStatus: paymentStatusSchema,
@@ -75,7 +80,7 @@ export const invoiceSchema = z.object({
   updatedAt: z.string().min(1),
 });
 
-export const customerListSchema = z.array(customerSchema);
-export const invoiceListSchema = z.array(invoiceSchema);
+export const customerListSchema: z.ZodType<Customer[]> = z.array(customerSchema);
+export const invoiceListSchema: z.ZodType<Invoice[]> = z.array(invoiceSchema) as unknown as z.ZodType<Invoice[]>;
 
 export type InvoiceFormValues = z.infer<typeof invoiceSchema>;

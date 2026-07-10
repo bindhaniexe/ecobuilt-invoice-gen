@@ -1,3 +1,5 @@
+export type InvoiceType = "tax-invoice" | "proforma";
+
 export type PaymentStatus = "draft" | "pending" | "paid" | "overdue";
 
 export type PaymentMethod =
@@ -60,6 +62,7 @@ export interface InvoiceTotals {
 export interface Invoice {
   id: string;
   invoiceNumber: string;
+  invoiceType: InvoiceType;
   issueDate: string;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
