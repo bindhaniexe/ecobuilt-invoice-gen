@@ -326,7 +326,7 @@ export function DashboardPage() {
           </div>
         ) : null}
 
-        <div className="mt-6 overflow-x-auto">
+        <div className="mt-6 hidden md:block overflow-x-auto">
           <table className="w-full min-w-[760px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-hairline text-xs font-semibold uppercase tracking-[0.04em] text-muted">
@@ -436,6 +436,124 @@ export function DashboardPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile-first card list */}
+        <div className="mt-6 block md:hidden space-y-4">
+          {loading ? (
+            <div className="py-10 text-center text-muted">
+              Loading invoices...
+            </div>
+          ) : filteredInvoices.length ? (
+            filteredInvoices.map((invoice) => (
+              <div
+                key={invoice.id}
+                className="section-panel p-4 flex flex-col gap-3"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex flex-col gap-1 items-start">
+                    <span className="font-semibold text-ink">
+                      {invoice.invoiceNumber}
+                    </span>
+                    <span
+                      className={`text-[9px] px-1.5 py-0.5 rounded border leading-none font-semibold ${
+                        invoice.invoiceType === "proforma"
+                          ? "bg-[#faf5ff] text-[#6b21a8] border-[#e9d5ff]"
+                          : "bg-[#f8fafc] text-[#475569] border-[#e2e8f0]"
+                      }`}
+                    >
+                      {invoice.invoiceType === "proforma" ? "Proforma" : "Tax Invoice"}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-semibold text-ink text-base">
+                      {formatCurrency(invoice.totals.grandTotal)}
+                    </span>
+                    <p className="text-[11px] text-muted mt-1">
+                      {formatDate(invoice.issueDate)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between border-t border-hairline-soft pt-3">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-muted">Customer</p>
+                    <p className="text-sm font-medium text-body mt-0.5">
+                      {invoice.customerSnapshot.name || "Manual"}
+                    </p>
+                  </div>
+                  <div>
+                    <Badge tone={statusTone(invoice.paymentStatus)}>
+                      {invoice.paymentStatus}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 border-t border-hairline-soft pt-3">
+                  {invoice.invoiceType === "proforma" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      title="Convert to Tax Invoice"
+                      aria-label="Convert to Tax Invoice"
+                      className="h-9 px-3"
+                      onClick={async () => {
+                        if (!repository) return;
+                        if (window.confirm(`Convert Proforma ${invoice.invoiceNumber} to a Tax Invoice?`)) {
+                          const allInvoices = await repository.list();
+                          const existing = allInvoices.map((record) => record.invoiceNumber);
+                          const nextType: InvoiceType = "tax-invoice";
+                          const generatedNum = generateInvoiceNumber(
+                            new Date(invoice.issueDate),
+                            existing,
+                            nextType
+                          );
+                          const updatedInvoice: Invoice = {
+                            ...invoice,
+                            invoiceType: nextType,
+                            invoiceNumber: generatedNum,
+                            updatedAt: new Date().toISOString()
+                          };
+                          await repository.update(invoice.id, updatedInvoice);
+                          await refresh();
+                        }
+                      }}
+                    >
+                      <FileCheck className="h-4 w-4 text-[#76b810] mr-1.5" aria-hidden="true" />
+                      Convert
+                    </Button>
+                  )}
+                  <Button asChild variant="ghost" size="sm" aria-label="Edit invoice" className="h-9 px-3">
+                    <Link href={`/invoices/${invoice.id}/edit`}>
+                      <Edit className="h-4 w-4 mr-1.5" aria-hidden="true" />
+                      Edit
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label="Delete invoice"
+                    className="h-9 px-3 text-[#e53e3e] hover:text-[#e53e3e]"
+                    onClick={() => {
+                      if (window.confirm("Delete this invoice?")) {
+                        void remove(invoice.id);
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-1.5" aria-hidden="true" />
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="py-12 text-center">
+              <p className="font-semibold text-ink">No invoices yet</p>
+              <p className="mt-1 text-sm text-muted">
+                Create your first invoice to see it here.
+              </p>
+            </div>
+          )}
         </div>
       </section>
     </div>
