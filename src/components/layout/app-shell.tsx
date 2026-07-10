@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FileText, LayoutDashboard, Menu, Users } from "lucide-react";
@@ -21,9 +22,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       <header className="app-chrome no-print sticky top-0 z-50 border-b border-hairline bg-white backdrop-blur">
         <div className="app-section flex h-20 items-center justify-between gap-4">
           <Link href="/" className="flex items-center gap-3 text-ink">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-rausch text-white">
-              <FileText className="h-5 w-5" aria-hidden="true" />
-            </span>
+            <Image
+              src="/logo.svg"
+              alt="Ecobuilt logo"
+              width={40}
+              height={40}
+              className="rounded-md"
+              priority
+            />
             <span className="text-base font-semibold">Invoice Gen</span>
           </Link>
 

@@ -20,9 +20,9 @@ const config: Config = {
         "surface-soft": "#f7f7f7",
         "surface-strong": "#f2f2f2",
         rausch: {
-          DEFAULT: "#ff385c",
-          active: "#e00b41",
-          disabled: "#ffd1da",
+          DEFAULT: "var(--rausch)",
+          active: "var(--rausch-active)",
+          disabled: "var(--rausch-disabled)",
         },
       },
       borderRadius: {

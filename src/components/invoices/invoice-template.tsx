@@ -69,16 +69,21 @@ export function InvoiceTemplate({
     <article className="invoice-page shadow-airbnb">
       <div className="flex min-h-[297mm] flex-col p-[14mm]">
         <header className="flex items-start justify-between gap-8 border-b border-hairline pb-6">
-          <div>
-            <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-full bg-rausch text-xl font-bold text-white">
-              {invoice.company.name.slice(0, 1).toUpperCase() || "I"}
+          <div className="flex items-start gap-4">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.svg"
+              alt="Company logo"
+              className="h-14 w-14 rounded-md object-contain"
+            />
+            <div>
+              <h2 className="max-w-[100mm] text-[22px] font-semibold leading-tight text-ink">
+                {invoice.company.name}
+              </h2>
+              <p className="mt-2 max-w-[85mm] whitespace-pre-line text-[11px] leading-5 text-muted">
+                {invoice.company.address}
+              </p>
             </div>
-            <h2 className="max-w-[100mm] text-[22px] font-semibold leading-tight text-ink">
-              {invoice.company.name}
-            </h2>
-            <p className="mt-2 max-w-[85mm] whitespace-pre-line text-[11px] leading-5 text-muted">
-              {invoice.company.address}
-            </p>
           </div>
           <div className="text-right">
             <h1 className="text-[28px] font-bold leading-none text-ink">Invoice</h1>

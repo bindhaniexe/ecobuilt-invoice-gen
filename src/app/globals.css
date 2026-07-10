@@ -9,7 +9,9 @@
   --body: #3f3f3f;
   --muted: #6a6a6a;
   --hairline: #dddddd;
-  --rausch: #ff385c;
+  --rausch: #76b810;
+  --rausch-active: #5f950d;
+  --rausch-disabled: #d4e8a8;
 }
 
 * {
