@@ -6,6 +6,7 @@ import type { InvoiceItem } from "@/domain/invoices/types";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 
 export function ItemTable({
   items,
@@ -83,17 +84,17 @@ export function ItemTable({
                   />
                 </td>
                 <td className="px-3 py-3">
-                  <Input
-                    className="h-11 text-right"
-                    type="number"
-                    min="0"
-                    step="0.01"
+                  <Select
+                    className="h-11 py-0 pl-2 pr-8 text-sm text-right"
                     value={item.gstRate}
                     onChange={(event) =>
                       onChange(item.id, { gstRate: Number(event.target.value) })
                     }
                     aria-label="GST percent"
-                  />
+                  >
+                    <option value="12">12%</option>
+                    <option value="18">18%</option>
+                  </Select>
                 </td>
                 <td className="px-3 py-3">
                   <Input

@@ -88,7 +88,10 @@ export function InvoiceTemplate({
           </div>
           <div className="text-right">
             <h1 className="text-[28px] font-bold leading-none text-ink">Invoice</h1>
-            <p className="mt-3 rounded-full bg-surface-soft px-4 py-2 text-[12px] font-semibold text-ink">
+            <p
+              className="mt-3 px-4 py-2 text-[12px] font-semibold text-ink"
+              style={{ backgroundColor: "#f7f7f7", borderRadius: "9999px" }}
+            >
               {invoice.invoiceNumber}
             </p>
             <p className="mt-3 text-[10px] uppercase tracking-[0.08em] text-muted">
@@ -133,13 +136,16 @@ export function InvoiceTemplate({
         <section className="mt-5 flex-1">
           <table className="w-full border-collapse text-[11px]">
             <thead>
-              <tr className="bg-surface-soft text-left text-[10px] uppercase tracking-[0.06em] text-muted">
-                <th className="rounded-l-sm px-3 py-3">Description</th>
+              <tr
+                className="text-left text-[10px] uppercase tracking-[0.06em] text-muted"
+                style={{ backgroundColor: "#f7f7f7" }}
+              >
+                <th className="px-3 py-3" style={{ borderRadius: "8px 0 0 8px" }}>Description</th>
                 <th className="px-3 py-3 text-right">Qty</th>
                 <th className="px-3 py-3 text-right">Rate</th>
                 <th className="px-3 py-3 text-right">GST</th>
                 <th className="px-3 py-3 text-right">Discount</th>
-                <th className="rounded-r-sm px-3 py-3 text-right">Total</th>
+                <th className="px-3 py-3 text-right" style={{ borderRadius: "0 8px 8px 0" }}>Total</th>
               </tr>
             </thead>
             <tbody>
@@ -176,7 +182,10 @@ export function InvoiceTemplate({
               </p>
 
               <div className="mt-6 grid gap-5">
-                <div className="rounded-md border border-hairline bg-surface-soft p-3">
+                <div
+                  className="p-3"
+                  style={{ backgroundColor: "#f7f7f7", border: "1px solid #dddddd", borderRadius: "14px" }}
+                >
                   <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-muted">
                     Bank Account Details
                   </p>
@@ -199,7 +208,10 @@ export function InvoiceTemplate({
             </div>
 
             <div>
-              <div className="rounded-md border border-hairline p-4 text-[12px]">
+              <div
+                className="p-4 text-[12px]"
+                style={{ border: "1px solid #dddddd", borderRadius: "14px" }}
+              >
                 <TotalRow label="Subtotal" value={invoice.totals.subtotal} />
                 <TotalRow label="Discount" value={invoice.totals.discount} />
                 <TotalRow label="Taxable amount" value={invoice.totals.taxableAmount} />
@@ -220,9 +232,16 @@ export function InvoiceTemplate({
               </div>
 
               <div className="mt-8 text-right">
-                <div className="ml-auto flex h-16 w-32 items-center justify-center rounded-full border border-dashed border-hairline text-[10px] font-semibold uppercase tracking-[0.08em] text-muted">
-                  Seal
-                </div>
+                {invoice.sealUrl ? (
+                  <div className="ml-auto mb-4 flex h-16 w-32 items-center justify-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={invoice.sealUrl}
+                      alt="Company seal"
+                      className="max-h-16 max-w-32 object-contain"
+                    />
+                  </div>
+                ) : null}
                 <div className="ml-auto mt-8 h-px w-40 bg-ink" />
                 <p className="mt-2 text-[11px] font-semibold text-ink">
                   {invoice.signature || defaultCompany.name}
