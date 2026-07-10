@@ -1,0 +1,119 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --canvas: #ffffff;
+  --ink: #222222;
+  --body: #3f3f3f;
+  --muted: #6a6a6a;
+  --hairline: #dddddd;
+  --rausch: #ff385c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--canvas);
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+  background: var(--canvas);
+  color: var(--body);
+  font-family:
+    Inter,
+    Circular,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    sans-serif;
+  letter-spacing: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.app-section {
+  width: min(100% - 32px, 1280px);
+  margin: 0 auto;
+}
+
+.section-panel {
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.invoice-page {
+  width: 210mm;
+  min-height: 297mm;
+  background: #ffffff;
+  color: #222222;
+  font-family:
+    Inter,
+    Circular,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  page-break-after: always;
+}
+
+.invoice-page:last-child {
+  page-break-after: auto;
+}
+
+.invoice-preview-scale {
+  transform: scale(var(--preview-scale));
+  transform-origin: top left;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  html,
+  body {
+    width: 210mm;
+    min-height: 297mm;
+    background: #ffffff !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+
+  .print-area {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 210mm;
+  }
+
+  .invoice-page {
+    width: 210mm !important;
+    min-height: 297mm !important;
+    box-shadow: none !important;
+  }
+
+  .no-print,
+  .no-print * {
+    display: none !important;
+  }
+}

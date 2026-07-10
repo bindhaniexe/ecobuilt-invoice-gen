@@ -1,0 +1,12 @@
+.pnpm-store
+.next
+node_modules
+.git
+.github
+.agents
+.claude
+.kiro
+.npmrc
+pnpm-lock.yaml
+pnpm-workspace.yaml
+tests

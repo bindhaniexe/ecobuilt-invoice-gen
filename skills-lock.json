@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "backend-patterns": {
+      "source": "affaan-m/everything-claude-code",
+      "sourceType": "github",
+      "skillPath": "skills/backend-patterns/SKILL.md",
+      "computedHash": "82ef426e6923d9ede1213e2062a0f069071afa3013f61b96d57db93d2dc2410c"
+    },
+    "dashboard-builder": {
+      "source": "affaan-m/everything-claude-code",
+      "sourceType": "github",
+      "skillPath": "skills/dashboard-builder/SKILL.md",
+      "computedHash": "7876504905ee7f206f325b534bbee205951d9812c42ce5a46f9386f55f9dce8f"
+    }
+  }
+}

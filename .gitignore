@@ -1,0 +1,16 @@
+.next
+node_modules
+coverage
+dist
+playwright-report
+test-results
+.env
+.env.local
+output
+tmp
+.pnpm-store
+.claude
+.codegraph
+.kiro
+*.tsbuildinfo
+.agents
