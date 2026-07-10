@@ -42,7 +42,7 @@ describe("DashboardPage", () => {
     // Wait for the invoice to be loaded and listed
     await waitFor(() => {
       expect(screen.getByText("INV-9999")).toBeInTheDocument();
-      expect(screen.getByText("Test Client")).toBeInTheDocument();
+      expect(screen.getAllByText("Test Client").length).toBeGreaterThanOrEqual(1);
     });
 
     // Locate and click the delete button

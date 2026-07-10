@@ -11,7 +11,7 @@ export function formatCurrency(value: number): string {
     maximumFractionDigits: 2,
   }).format(Number.isFinite(value) ? value : 0);
 
-  return `Rs. ${amount}`;
+  return `₹${amount}`;
 }
 
 export function formatDate(value: string): string {

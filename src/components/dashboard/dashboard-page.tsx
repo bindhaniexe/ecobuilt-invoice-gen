@@ -3,15 +3,19 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
+  AlertCircle,
+  BarChart3,
+  DollarSign,
   Edit,
   FileText,
-  IndianRupee,
+  Hourglass,
   Plus,
   Search,
   Trash2,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
-import type { PaymentStatus } from "@/domain/invoices/types";
+import type { Invoice, PaymentStatus } from "@/domain/invoices/types";
 import { useInvoices } from "@/hooks/use-local-data";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +35,56 @@ function statusTone(status: PaymentStatus) {
   return status;
 }
 
+/* ---------- Aging helpers ---------- */
+
+interface AgingBucket {
+  label: string;
+  amount: number;
+}
+
+function computeAgingBuckets(invoices: Invoice[]): AgingBucket[] {
+  const now = Date.now();
+  const buckets: AgingBucket[] = [
+    { label: "0-30 days", amount: 0 },
+    { label: "30-60 days", amount: 0 },
+    { label: "60-90 days", amount: 0 },
+    { label: "90+ days", amount: 0 },
+  ];
+
+  for (const inv of invoices) {
+    if (inv.paymentStatus === "paid" || inv.paymentStatus === "draft") continue;
+    const days = Math.floor(
+      (now - new Date(inv.issueDate).getTime()) / (1000 * 60 * 60 * 24),
+    );
+    const due = inv.totals.balanceDue;
+    if (days < 30) buckets[0].amount += due;
+    else if (days < 60) buckets[1].amount += due;
+    else if (days < 90) buckets[2].amount += due;
+    else buckets[3].amount += due;
+  }
+
+  return buckets;
+}
+
+interface ClientRevenue {
+  name: string;
+  revenue: number;
+}
+
+function computeTopClients(invoices: Invoice[], limit = 5): ClientRevenue[] {
+  const map = new Map<string, number>();
+  for (const inv of invoices) {
+    const name = inv.customerSnapshot.name || "Manual";
+    map.set(name, (map.get(name) ?? 0) + inv.totals.grandTotal);
+  }
+  return [...map.entries()]
+    .map(([name, revenue]) => ({ name, revenue }))
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, limit);
+}
+
+/* ---------- Dashboard ---------- */
+
 export function DashboardPage() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<PaymentStatus | "all">("all");
@@ -40,20 +94,42 @@ export function DashboardPage() {
   });
 
   const stats = useMemo(() => {
-    const paid = invoices.filter((invoice) => invoice.paymentStatus === "paid");
-    const pending = invoices.filter((invoice) => invoice.paymentStatus === "pending");
+    const totalInvoiced = invoices.reduce(
+      (sum, inv) => sum + inv.totals.grandTotal,
+      0,
+    );
+    const received = invoices.reduce((sum, inv) => sum + inv.amountPaid, 0);
     const outstanding = invoices.reduce(
-      (sum, invoice) => sum + invoice.totals.balanceDue,
+      (sum, inv) => sum + inv.totals.balanceDue,
+      0,
+    );
+    const overdueInvoices = invoices.filter(
+      (inv) => inv.paymentStatus === "overdue",
+    );
+    const overdue = overdueInvoices.reduce(
+      (sum, inv) => sum + inv.totals.balanceDue,
       0,
     );
 
     return {
-      total: invoices.length,
-      paid: paid.length,
-      pending: pending.length,
+      totalInvoiced,
+      received,
       outstanding,
+      overdue,
+      overdueCount: overdueInvoices.length,
     };
   }, [invoices]);
+
+  const agingBuckets = useMemo(
+    () => computeAgingBuckets(invoices),
+    [invoices],
+  );
+  const agingTotal = useMemo(
+    () => agingBuckets.reduce((s, b) => s + b.amount, 0),
+    [agingBuckets],
+  );
+
+  const topClients = useMemo(() => computeTopClients(invoices), [invoices]);
 
   return (
     <div className="app-section py-10">
@@ -75,17 +151,78 @@ export function DashboardPage() {
         </Button>
       </div>
 
+      {/* ── Stat Cards ── */}
       <section className="grid gap-4 md:grid-cols-4" aria-label="Invoice summary">
-        <StatTile label="Total invoices" value={stats.total.toString()} icon={FileText} />
-        <StatTile label="Paid" value={stats.paid.toString()} icon={FileText} />
-        <StatTile label="Pending" value={stats.pending.toString()} icon={FileText} />
-        <StatTile
-          label="Balance due"
+        <StatCard
+          label="Total Invoiced"
+          value={formatCurrency(stats.totalInvoiced)}
+          subtitle="all time"
+          icon={FileText}
+          accentColor="#334155"
+          borderColor="#cbd5e1"
+        />
+        <StatCard
+          label="Received"
+          value={formatCurrency(stats.received)}
+          subtitle="all time"
+          icon={DollarSign}
+          accentColor="#76b810"
+          borderColor="#a3d660"
+        />
+        <StatCard
+          label="Outstanding"
           value={formatCurrency(stats.outstanding)}
-          icon={IndianRupee}
+          subtitle="unpaid invoices"
+          icon={Hourglass}
+          accentColor="#d97706"
+          borderColor="#fbbf24"
+        />
+        <StatCard
+          label="Overdue"
+          value={formatCurrency(stats.overdue)}
+          subtitle={
+            stats.overdueCount === 0
+              ? "nothing overdue"
+              : `${stats.overdueCount} overdue`
+          }
+          icon={AlertCircle}
+          accentColor="#e53e3e"
+          borderColor="#fc8181"
         />
       </section>
 
+      {/* ── Analytics ── */}
+      <h2 className="mb-4 mt-10 text-[20px] font-bold text-ink">Analytics</h2>
+      <section className="grid gap-4 md:grid-cols-2" aria-label="Analytics">
+        {/* Outstanding Invoice Aging */}
+        <div className="section-panel p-6">
+          <h3 className="text-[15px] font-bold text-ink">
+            Outstanding Invoice Aging
+          </h3>
+          <p className="mt-1 text-sm text-muted">
+            Total: {formatCurrency(agingTotal)}
+          </p>
+          <AgingChart buckets={agingBuckets} />
+        </div>
+
+        {/* Top Clients */}
+        <div className="section-panel p-6">
+          <h3 className="text-[15px] font-bold text-ink">Top Clients</h3>
+          <p className="mt-1 text-sm text-muted">Revenue by client</p>
+          {topClients.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-muted">
+              <BarChart3 className="mb-3 h-10 w-10 opacity-40" aria-hidden="true" />
+              <p className="text-sm">
+                No client revenue data for the selected period
+              </p>
+            </div>
+          ) : (
+            <TopClientsChart clients={topClients} />
+          )}
+        </div>
+      </section>
+
+      {/* ── Invoice Table ── */}
       <section className="section-panel mt-8 p-4 md:p-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center">
           <div className="relative flex-1">
@@ -204,22 +341,162 @@ export function DashboardPage() {
   );
 }
 
-function StatTile({
+/* ---------- Stat Card ---------- */
+
+function StatCard({
   label,
   value,
+  subtitle,
   icon: Icon,
+  accentColor,
+  borderColor,
 }: {
   label: string;
   value: string;
-  icon: typeof FileText;
+  subtitle: string;
+  icon: LucideIcon;
+  accentColor: string;
+  borderColor: string;
 }) {
   return (
-    <div className="section-panel p-5">
-      <div className="mb-5 flex h-10 w-10 items-center justify-center rounded-full bg-surface-strong text-ink">
-        <Icon className="h-5 w-5" aria-hidden="true" />
+    <div
+      className="section-panel relative overflow-hidden p-5"
+      style={{ borderLeft: `3px solid ${borderColor}` }}
+    >
+      <div className="flex items-start justify-between">
+        <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted">
+          {label}
+        </p>
+        <div
+          className="flex h-8 w-8 items-center justify-center rounded-full"
+          style={{ backgroundColor: `${borderColor}22` }}
+        >
+          <Icon
+            className="h-4 w-4"
+            style={{ color: accentColor }}
+            aria-hidden="true"
+          />
+        </div>
       </div>
-      <p className="text-sm text-muted">{label}</p>
-      <p className="mt-2 text-[22px] font-semibold leading-tight text-ink">{value}</p>
+      <p
+        className="mt-3 text-[24px] font-bold leading-tight"
+        style={{ color: accentColor }}
+      >
+        {value}
+      </p>
+      <p className="mt-1 text-[12px] text-muted">{subtitle}</p>
+    </div>
+  );
+}
+
+/* ---------- Aging Bar Chart (pure CSS) ---------- */
+
+function AgingChart({ buckets }: { buckets: AgingBucket[] }) {
+  const max = Math.max(...buckets.map((b) => b.amount), 1);
+
+  // Y-axis ticks
+  const yTicks = generateYTicks(max);
+  const chartMax = yTicks[yTicks.length - 1];
+
+  return (
+    <div className="mt-6 flex gap-2" style={{ height: 200 }}>
+      {/* Y-axis labels */}
+      <div className="flex flex-col justify-between pb-6 text-right text-[10px] text-muted">
+        {[...yTicks].reverse().map((tick) => (
+          <span key={tick}>{formatYLabel(tick)}</span>
+        ))}
+      </div>
+
+      {/* Bars area */}
+      <div className="flex flex-1 items-end gap-3 border-l border-b border-hairline-soft pb-6 pl-2">
+        {buckets.map((bucket) => {
+          const pct = chartMax > 0 ? (bucket.amount / chartMax) * 100 : 0;
+          return (
+            <div
+              key={bucket.label}
+              className="flex flex-1 flex-col items-center gap-1"
+            >
+              <div className="relative w-full" style={{ height: "calc(200px - 24px)" }}>
+                <div
+                  className="absolute bottom-0 left-1/2 w-3/4 -translate-x-1/2 rounded-t-xs"
+                  style={{
+                    height: `${pct}%`,
+                    background:
+                      "linear-gradient(to top, var(--rausch), var(--rausch-active))",
+                    minHeight: bucket.amount > 0 ? 4 : 0,
+                    transition: "height 0.4s ease",
+                  }}
+                />
+              </div>
+              <span className="whitespace-nowrap text-[10px] text-muted">
+                {bucket.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function generateYTicks(max: number): number[] {
+  if (max === 0) return [0, 250, 500, 750, 1000];
+  const step = niceStep(max);
+  const ticks: number[] = [];
+  for (let v = 0; v <= max + step; v += step) {
+    ticks.push(v);
+    if (ticks.length >= 6) break;
+  }
+  return ticks;
+}
+
+function niceStep(max: number): number {
+  const rough = max / 4;
+  const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+  const norm = rough / mag;
+  if (norm <= 1) return mag;
+  if (norm <= 2) return 2 * mag;
+  if (norm <= 5) return 5 * mag;
+  return 10 * mag;
+}
+
+function formatYLabel(value: number): string {
+  if (value >= 1_00_000) return `${(value / 1_00_000).toFixed(0)}L`;
+  if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
+  return value.toString();
+}
+
+/* ---------- Top Clients ---------- */
+
+function TopClientsChart({ clients }: { clients: ClientRevenue[] }) {
+  const max = Math.max(...clients.map((c) => c.revenue), 1);
+
+  return (
+    <div className="mt-6 space-y-3">
+      {clients.map((client) => {
+        const pct = (client.revenue / max) * 100;
+        return (
+          <div key={client.name}>
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium text-ink">{client.name}</span>
+              <span className="font-semibold text-ink">
+                {formatCurrency(client.revenue)}
+              </span>
+            </div>
+            <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-surface-strong">
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${pct}%`,
+                  background:
+                    "linear-gradient(to right, var(--rausch), var(--rausch-active))",
+                  transition: "width 0.4s ease",
+                }}
+              />
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
