@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   AlertCircle,
   BarChart3,
@@ -103,6 +103,8 @@ export function DashboardPage() {
     query,
     status,
   });
+
+
 
   const filteredInvoices = useMemo(() => {
     return invoices.filter((inv) => {
@@ -272,6 +274,7 @@ export function DashboardPage() {
           )}
         </div>
       </section>
+
 
       {/* ── Invoice Table ── */}
       <section className="section-panel mt-8 p-4 md:p-6">
