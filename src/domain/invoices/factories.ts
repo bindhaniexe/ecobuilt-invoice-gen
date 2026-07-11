@@ -16,7 +16,7 @@ export const defaultCompany: CompanyDetails = {
   address: "Ramdaspur Industrial Estate, Office - Trisulia, Dist - Cuttack, State - Odisha, 754005",
   gstNumber: "21AAGF03736M1Z6",
   phone: "+91 97771 03202",
-  email: "info@ommecobuildtech.in",
+  email: "ommecobuildtech@gmail.com",
   website: "www.ommecobuildtech.in",
 };
 
