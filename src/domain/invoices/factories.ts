@@ -13,7 +13,7 @@ import type {
 
 export const defaultCompany: CompanyDetails = {
   name: "OMM ECO BUILDTECH",
-  address: "Ramdaspur Industrial Estate, Office - Trisulia, Dist - Cuttack, State - Odisha, 754005",
+  address: "Ramdaspur Industrial Estate, Office - Trisulia, Cuttack, Odisha, 754005",
   gstNumber: "21AAGF03736M1Z6",
   phone: "+91 97771 03202",
   email: "ommecobuildtech@gmail.com",
@@ -49,7 +49,7 @@ export function createInvoiceItem(
 ): InvoiceItem {
   const calculated = calculateLineItem({
     description: input.description ?? "",
-    quantity: input.quantity ?? 1,
+    quantity: input.quantity ?? 0,
     unit: input.unit ?? "CUM",
     unitPrice: input.unitPrice ?? 0,
     gstRate: input.gstRate ?? 18,
@@ -68,7 +68,7 @@ export function createInvoiceDraft(
 ): Invoice {
   const now = new Date().toISOString();
   const issueDate = now.slice(0, 10);
-  const items = [createInvoiceItem({ description: "Service description" })];
+  const items = [createInvoiceItem()];
   const totals = calculateInvoiceTotals(items, 0);
 
   return {

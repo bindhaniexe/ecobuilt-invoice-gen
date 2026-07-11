@@ -52,6 +52,7 @@ export function ItemTable({
                   <Input
                     className="h-11"
                     value={item.description}
+                    placeholder="Service description"
                     onChange={(event) =>
                       onChange(item.id, { description: event.target.value })
                     }
@@ -64,10 +65,12 @@ export function ItemTable({
                     type="number"
                     min="0"
                     step="1"
-                    value={item.quantity}
-                    onChange={(event) =>
-                      onChange(item.id, { quantity: Number(event.target.value) })
-                    }
+                    value={item.quantity === 0 ? "" : item.quantity}
+                    placeholder="1"
+                    onChange={(event) => {
+                      const val = event.target.value;
+                      onChange(item.id, { quantity: val === "" ? 0 : Number(val) });
+                    }}
                     aria-label="Quantity"
                   />
                 </td>
@@ -91,10 +94,12 @@ export function ItemTable({
                     type="number"
                     min="0"
                     step="0.01"
-                    value={item.unitPrice}
-                    onChange={(event) =>
-                      onChange(item.id, { unitPrice: Number(event.target.value) })
-                    }
+                    value={item.unitPrice === 0 ? "" : item.unitPrice}
+                    placeholder="0"
+                    onChange={(event) => {
+                      const val = event.target.value;
+                      onChange(item.id, { unitPrice: val === "" ? 0 : Number(val) });
+                    }}
                     aria-label="Unit price"
                   />
                 </td>

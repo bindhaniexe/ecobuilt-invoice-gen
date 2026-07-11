@@ -12,11 +12,11 @@ function positive(value: number | undefined): number {
 export function calculateLineItem<T extends InvoiceItemInput>(
   item: T,
 ): Omit<InvoiceItem, "id"> & T {
-  const quantity = positive(item.quantity);
+  const calcQuantity = item.quantity === 0 ? 1 : positive(item.quantity);
   const unit = item.unit || "CUM";
   const unitPrice = positive(item.unitPrice);
   const gstRate = positive(item.gstRate);
-  const lineGross = roundMoney(quantity * unitPrice);
+  const lineGross = roundMoney(calcQuantity * unitPrice);
   const discountAmount = Math.min(positive(item.discountAmount), lineGross);
   const taxableAmount = roundMoney(lineGross - discountAmount);
   const gstAmount = roundMoney((taxableAmount * gstRate) / 100);
@@ -24,7 +24,6 @@ export function calculateLineItem<T extends InvoiceItemInput>(
 
   return {
     ...item,
-    quantity,
     unit,
     unitPrice,
     gstRate,
@@ -41,7 +40,10 @@ export function calculateInvoiceTotals(
 ): InvoiceTotals {
   const calculatedItems = items.map(calculateLineItem);
   const subtotal = roundMoney(
-    calculatedItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0),
+    calculatedItems.reduce((sum, item) => {
+      const calcQuantity = item.quantity === 0 ? 1 : positive(item.quantity);
+      return sum + calcQuantity * item.unitPrice;
+    }, 0),
   );
   const discount = roundMoney(
     calculatedItems.reduce((sum, item) => sum + item.discountAmount, 0),

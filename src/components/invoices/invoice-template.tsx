@@ -155,9 +155,9 @@ export function InvoiceTemplate({
               {items.map((item) => (
                 <tr key={item.id} className="border-b border-hairline-soft">
                   <td className="max-w-[70mm] px-3 py-4 align-top font-medium text-ink">
-                    {item.description || "Item description"}
+                    {item.description || "Service description"}
                   </td>
-                  <td className="px-3 py-4 text-right align-top">{item.quantity}</td>
+                  <td className="px-3 py-4 text-right align-top">{item.quantity === 0 ? 1 : item.quantity}</td>
                   <td className="px-3 py-4 text-right align-top">{item.unit}</td>
                   <td className="px-3 py-4 text-right align-top">
                     {formatCurrency(item.unitPrice)}

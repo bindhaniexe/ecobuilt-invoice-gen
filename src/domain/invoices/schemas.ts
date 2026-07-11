@@ -36,7 +36,7 @@ export const customerSchema = customerDetailsSchema.extend({
 
 export const invoiceItemSchema = z.object({
   id: z.string().min(1),
-  description: z.string().min(1, "Description is required"),
+  description: z.string(),
   quantity: z.coerce.number().min(0),
   unit: z.string().default("CUM"),
   unitPrice: z.coerce.number().min(0),

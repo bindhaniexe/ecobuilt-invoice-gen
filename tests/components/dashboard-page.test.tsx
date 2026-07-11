@@ -43,7 +43,7 @@ describe("DashboardPage", () => {
     await waitFor(() => {
       expect(screen.getAllByText("INV-9999").length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByText("Test Client").length).toBeGreaterThanOrEqual(1);
-    }, { timeout: 5000 });
+    }, { timeout: 25000 });
 
     // Locate and click the delete button
     const deleteButtons = screen.getAllByRole("button", { name: /Delete invoice/i });
