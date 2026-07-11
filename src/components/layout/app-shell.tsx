@@ -407,7 +407,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </div>
 
-      <main className="flex-grow">{children}</main>
+      <main className="min-w-0 flex-grow overflow-x-hidden">{children}</main>
 
       <footer className="no-print mt-auto border-t border-hairline-soft py-6 text-center text-xs text-muted">
         <div className="app-section flex flex-col items-center justify-between gap-2 sm:flex-row">

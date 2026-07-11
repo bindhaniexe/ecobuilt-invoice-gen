@@ -1,9 +1,6 @@
 "use client";
 
-export async function downloadInvoicePdf(
-  printRoot: HTMLElement,
-  filename: string,
-): Promise<void> {
+async function renderInvoicePdf(printRoot: HTMLElement) {
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
     import("html2canvas"),
     import("jspdf"),
@@ -37,5 +34,38 @@ export async function downloadInvoicePdf(
     pdf.addImage(image, "PNG", 0, 0, 210, 297, undefined, "FAST");
   }
 
+  return pdf;
+}
+
+export async function downloadInvoicePdf(
+  printRoot: HTMLElement,
+  filename: string,
+): Promise<void> {
+  const pdf = await renderInvoicePdf(printRoot);
   pdf.save(`${filename}.pdf`);
+}
+
+export async function createInvoicePdfFile(
+  printRoot: HTMLElement,
+  filename: string,
+): Promise<File> {
+  const pdf = await renderInvoicePdf(printRoot);
+  const blob = pdf.output("blob");
+  return new File([blob], `${filename}.pdf`, { type: "application/pdf" });
+}
+
+export function canShareInvoicePdf(file: File): boolean {
+  if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
+    return false;
+  }
+
+  if (typeof navigator.canShare !== "function") {
+    return true;
+  }
+
+  try {
+    return navigator.canShare({ files: [file] });
+  } catch {
+    return false;
+  }
 }

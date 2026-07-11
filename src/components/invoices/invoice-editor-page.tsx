@@ -2,12 +2,19 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import {
   AlertCircle,
   ArrowLeft,
   Download,
   FileCheck,
+  MessageCircle,
   Printer,
   Save,
 } from "lucide-react";
@@ -31,7 +38,11 @@ import type {
   PaymentStatus,
 } from "@/domain/invoices/types";
 import { useCustomers, useInvoices } from "@/hooks/use-local-data";
-import { downloadInvoicePdf } from "@/lib/pdf";
+import {
+  canShareInvoicePdf,
+  createInvoicePdfFile,
+  downloadInvoicePdf,
+} from "@/lib/pdf";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -60,6 +71,7 @@ const paymentStatuses: Array<{ value: PaymentStatus; label: string }> = [
 export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
   const router = useRouter();
   const printRef = useRef<HTMLDivElement>(null);
+  const previewViewportRef = useRef<HTMLDivElement>(null);
   const { repository: invoiceRepository } = useInvoices();
   const { customers } = useCustomers();
   const [invoice, setInvoice] = useState<Invoice | null>(null);
@@ -67,8 +79,11 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [message, setMessage] = useState("");
   const [formError, setFormError] = useState("");
+  const [previewScale, setPreviewScale] = useState(1);
+  const [previewHeight, setPreviewHeight] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     const repository = invoiceRepository;
@@ -124,8 +139,59 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
     setInvoice((current) => (current ? recalculateInvoice(updater(current)) : current));
   }
 
-  async function handleSave() {
-    if (!invoiceRepository || !invoice) return;
+  // Fit the fixed A4 preview into the available width on mobile without
+  // changing the invoice layout. Print/PDF temporarily use full size.
+  useLayoutEffect(() => {
+    if (!invoice) return;
+
+    const viewport = previewViewportRef.current;
+    if (!viewport) return;
+
+    // CSS mm at 96dpi — matches browser rendering of width: 210mm
+    const A4_WIDTH_PX = (210 * 96) / 25.4;
+
+    const updateScale = () => {
+      const styles = window.getComputedStyle(viewport);
+      const paddingX =
+        Number.parseFloat(styles.paddingLeft) + Number.parseFloat(styles.paddingRight);
+      const availableWidth = viewport.clientWidth - paddingX;
+      if (availableWidth <= 0) return;
+      const next = Math.min(1, availableWidth / A4_WIDTH_PX);
+      setPreviewScale(Number(next.toFixed(4)));
+    };
+
+    updateScale();
+    const observer = new ResizeObserver(updateScale);
+    observer.observe(viewport);
+    window.addEventListener("resize", updateScale);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateScale);
+    };
+  }, [invoice]);
+
+  useLayoutEffect(() => {
+    if (!invoice) return;
+
+    const printRoot = printRef.current;
+    if (!printRoot) return;
+
+    const updateHeight = () => {
+      // offsetHeight is unscaled layout size; multiply by preview scale
+      setPreviewHeight(printRoot.offsetHeight * previewScale);
+    };
+
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(printRoot);
+    return () => observer.disconnect();
+  }, [invoice, previewScale]);
+
+  async function handleSave(options?: {
+    quiet?: boolean;
+    skipNavigation?: boolean;
+  }): Promise<Invoice | null> {
+    if (!invoiceRepository || !invoice) return null;
 
     const normalized = recalculateInvoice({
       ...invoice,
@@ -135,7 +201,7 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
 
     if (!parsed.success) {
       setFormError(parsed.error.issues[0]?.message ?? "Check the invoice fields.");
-      return;
+      return null;
     }
 
     setSaving(true);
@@ -147,28 +213,157 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
         : await invoiceRepository.create(parsed.data);
 
       setInvoice(saved);
-      setMessage("Invoice saved.");
+      if (!options?.quiet) {
+        setMessage("Invoice saved.");
+      }
 
-      if (!invoiceId) {
+      if (!invoiceId && !options?.skipNavigation) {
         router.replace(`/invoices/${saved.id}/edit`);
       }
+
+      return saved;
     } catch (error) {
       setFormError((error as Error).message);
+      return null;
     } finally {
       setSaving(false);
     }
   }
 
+  async function handlePrint() {
+    const saved = await handleSave({ quiet: true, skipNavigation: true });
+    if (!saved) return;
+    setMessage("Invoice saved. Opening print dialog...");
+    window.print();
+    if (!invoiceId) {
+      router.replace(`/invoices/${saved.id}/edit`);
+    }
+  }
+
+  async function withUnscaledPreview<T>(action: () => Promise<T>): Promise<T> {
+    if (!printRef.current) {
+      throw new Error("Invoice preview is not ready.");
+    }
+
+    // Temporarily remove live-preview scale so html2canvas captures full A4.
+    const scaleEl = printRef.current.closest(
+      ".invoice-preview-scale",
+    ) as HTMLElement | null;
+    if (scaleEl) {
+      scaleEl.style.setProperty("transform", "none");
+    }
+
+    try {
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+      return await action();
+    } finally {
+      if (scaleEl) {
+        scaleEl.style.removeProperty("transform");
+      }
+    }
+  }
+
   async function handleDownload() {
     if (!printRef.current || !invoice) return;
+
+    const saved = await handleSave({ quiet: true, skipNavigation: true });
+    if (!saved) return;
+
     setExporting(true);
     setFormError("");
+    setMessage("Invoice saved. Exporting PDF...");
+
     try {
-      await downloadInvoicePdf(printRef.current, invoice.invoiceNumber);
+      await withUnscaledPreview(() =>
+        downloadInvoicePdf(printRef.current!, saved.invoiceNumber),
+      );
+      setMessage("Invoice saved and PDF downloaded.");
     } catch (error) {
       setFormError((error as Error).message || "PDF export failed.");
     } finally {
       setExporting(false);
+      if (!invoiceId) {
+        router.replace(`/invoices/${saved.id}/edit`);
+      }
+    }
+  }
+
+  async function handleWhatsAppShare() {
+    if (!printRef.current || !invoice) return;
+
+    const saved = await handleSave({ quiet: true, skipNavigation: true });
+    if (!saved) return;
+
+    setSharing(true);
+    setFormError("");
+    setMessage("Invoice saved. Preparing WhatsApp share...");
+
+    try {
+      const file = await withUnscaledPreview(() =>
+        createInvoicePdfFile(printRef.current!, saved.invoiceNumber),
+      );
+
+      const customerName = saved.customerSnapshot.name || "Customer";
+      const shareText = [
+        `Invoice ${saved.invoiceNumber}`,
+        `Customer: ${customerName}`,
+        `Grand total: ${formatCurrency(saved.totals.grandTotal)}`,
+        `Balance due: ${formatCurrency(saved.totals.balanceDue)}`,
+        "",
+        "Shared from OMM ECO BUILDTECH",
+      ].join("\n");
+
+      if (canShareInvoicePdf(file)) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: `Invoice ${saved.invoiceNumber}`,
+            text: shareText,
+          });
+          setMessage("Invoice saved and shared.");
+          return;
+        } catch (error) {
+          // User cancelled the system share sheet — not an error.
+          if ((error as Error).name === "AbortError") {
+            setMessage("Invoice saved. Share cancelled.");
+            return;
+          }
+        }
+      }
+
+      // Fallback: download PDF, then open WhatsApp with invoice summary.
+      // Browsers can't attach local files to wa.me links directly.
+      const objectUrl = URL.createObjectURL(file);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = file.name;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(objectUrl);
+
+      const phone = saved.customerSnapshot.phone?.replace(/\D/g, "") ?? "";
+      const whatsappUrl = phone
+        ? `https://wa.me/${phone}?text=${encodeURIComponent(
+            `${shareText}\n\nPDF downloaded — attach ${file.name} in WhatsApp.`,
+          )}`
+        : `https://wa.me/?text=${encodeURIComponent(
+            `${shareText}\n\nPDF downloaded — attach ${file.name} in WhatsApp.`,
+          )}`;
+
+      window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+      setMessage(
+        "Invoice saved. PDF downloaded — attach it in WhatsApp to complete sharing.",
+      );
+    } catch (error) {
+      setFormError((error as Error).message || "WhatsApp share failed.");
+    } finally {
+      setSharing(false);
+      if (!invoiceId) {
+        router.replace(`/invoices/${saved.id}/edit`);
+      }
     }
   }
 
@@ -219,8 +414,8 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
                 Live preview stays aligned with the A4 export target.
               </p>
             </div>
-            <div className="flex flex-wrap gap-3">
-              {invoice.invoiceType === "proforma" && (
+            {invoice.invoiceType === "proforma" ? (
+              <div className="flex flex-wrap gap-3">
                 <Button
                   type="button"
                   variant="secondary"
@@ -244,25 +439,8 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
                   <FileCheck className="h-4 w-4" aria-hidden="true" />
                   Convert to Tax Invoice
                 </Button>
-              )}
-              <Button type="button" variant="secondary" onClick={() => window.print()}>
-                <Printer className="h-4 w-4" aria-hidden="true" />
-                Print
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={exporting}
-                onClick={() => void handleDownload()}
-              >
-                <Download className="h-4 w-4" aria-hidden="true" />
-                {exporting ? "Exporting..." : "Download PDF"}
-              </Button>
-              <Button type="button" disabled={saving} onClick={() => void handleSave()}>
-                <Save className="h-4 w-4" aria-hidden="true" />
-                {saving ? "Saving..." : "Save invoice"}
-              </Button>
-            </div>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -313,8 +491,8 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
         )}
       </div>
 
-      <div className="app-section flex flex-col gap-6">
-        <div className="no-print space-y-6">
+      <div className="app-section flex min-w-0 flex-col gap-6">
+        <div className="no-print min-w-0 space-y-6">
           <section className="section-panel p-5 md:p-6">
             <SectionHeading title="Invoice details" />
             <div className="grid gap-4 md:grid-cols-2">
@@ -639,13 +817,78 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
           </section>
         </div>
 
-        <aside>
-          <div className="no-print mb-3 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-ink">Live preview</h2>
-            <p className="text-sm text-muted">A4 output</p>
+        <aside className="min-w-0 max-w-full">
+          <div className="no-print mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center justify-between gap-3 sm:justify-start">
+              <h2 className="text-base font-semibold text-ink">Live preview</h2>
+              <p className="text-sm text-muted">A4 output</p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={saving || exporting || sharing}
+                onClick={() => void handlePrint()}
+              >
+                <Printer className="h-4 w-4" aria-hidden="true" />
+                {saving ? "Saving..." : "Print"}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={saving || exporting || sharing}
+                onClick={() => void handleDownload()}
+              >
+                <Download className="h-4 w-4" aria-hidden="true" />
+                {exporting ? "Exporting..." : saving ? "Saving..." : "Download PDF"}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={saving || exporting || sharing}
+                onClick={() => void handleWhatsAppShare()}
+              >
+                <MessageCircle className="h-4 w-4" aria-hidden="true" />
+                {sharing
+                  ? "Sharing..."
+                  : saving
+                    ? "Saving..."
+                    : "WhatsApp"}
+              </Button>
+              <Button
+                type="button"
+                disabled={saving || exporting || sharing}
+                onClick={() => void handleSave()}
+              >
+                <Save className="h-4 w-4" aria-hidden="true" />
+                {saving ? "Saving..." : "Save invoice"}
+              </Button>
+            </div>
           </div>
-          <div className="overflow-auto rounded-md border border-hairline bg-surface-soft p-4">
-            <InvoicePreview invoice={invoice} printRef={printRef} />
+          <div
+            ref={previewViewportRef}
+            className="max-w-full overflow-x-hidden overflow-y-auto overscroll-x-contain rounded-md border border-hairline bg-surface-soft p-4"
+          >
+            <div
+              className="mx-auto overflow-hidden"
+              style={{
+                width: previewScale < 1 ? "100%" : "210mm",
+                height: previewHeight,
+                maxWidth: "100%",
+              }}
+            >
+              <div
+                className="invoice-preview-scale"
+                style={
+                  {
+                    "--preview-scale": String(previewScale),
+                    width: "210mm",
+                  } as CSSProperties
+                }
+              >
+                <InvoicePreview invoice={invoice} printRef={printRef} />
+              </div>
+            </div>
           </div>
         </aside>
       </div>
