@@ -13,6 +13,7 @@ export function calculateLineItem<T extends InvoiceItemInput>(
   item: T,
 ): Omit<InvoiceItem, "id"> & T {
   const quantity = positive(item.quantity);
+  const unit = item.unit || "CUM";
   const unitPrice = positive(item.unitPrice);
   const gstRate = positive(item.gstRate);
   const lineGross = roundMoney(quantity * unitPrice);
@@ -24,6 +25,7 @@ export function calculateLineItem<T extends InvoiceItemInput>(
   return {
     ...item,
     quantity,
+    unit,
     unitPrice,
     gstRate,
     discountAmount,

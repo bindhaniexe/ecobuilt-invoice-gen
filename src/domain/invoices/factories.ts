@@ -50,6 +50,7 @@ export function createInvoiceItem(
   const calculated = calculateLineItem({
     description: input.description ?? "",
     quantity: input.quantity ?? 1,
+    unit: input.unit ?? "CUM",
     unitPrice: input.unitPrice ?? 0,
     gstRate: input.gstRate ?? 18,
     discountAmount: input.discountAmount ?? 0,
@@ -96,6 +97,7 @@ export function recalculateInvoice(invoice: Invoice): Invoice {
     const calculated = calculateLineItem({
       description: item.description,
       quantity: item.quantity,
+      unit: item.unit,
       unitPrice: item.unitPrice,
       gstRate: item.gstRate,
       discountAmount: item.discountAmount,

@@ -144,6 +144,7 @@ export function InvoiceTemplate({
               >
                 <th className="px-3 py-3" style={{ borderRadius: "8px 0 0 8px" }}>Description</th>
                 <th className="px-3 py-3 text-right">Qty</th>
+                <th className="px-3 py-3 text-right">Unit</th>
                 <th className="px-3 py-3 text-right">Rate</th>
                 <th className="px-3 py-3 text-right">GST</th>
                 <th className="px-3 py-3 text-right">Discount</th>
@@ -157,6 +158,7 @@ export function InvoiceTemplate({
                     {item.description || "Item description"}
                   </td>
                   <td className="px-3 py-4 text-right align-top">{item.quantity}</td>
+                  <td className="px-3 py-4 text-right align-top">{item.unit}</td>
                   <td className="px-3 py-4 text-right align-top">
                     {formatCurrency(item.unitPrice)}
                   </td>

@@ -35,6 +35,7 @@ export interface Customer extends CustomerDetails {
 export interface InvoiceItemInput {
   description: string;
   quantity: number;
+  unit?: string;
   unitPrice: number;
   gstRate: number;
   discountAmount?: number;
@@ -42,6 +43,7 @@ export interface InvoiceItemInput {
 
 export interface InvoiceItem extends InvoiceItemInput {
   id: string;
+  unit: string;
   discountAmount: number;
   taxableAmount: number;
   gstAmount: number;

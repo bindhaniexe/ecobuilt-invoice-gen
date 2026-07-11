@@ -32,11 +32,12 @@ export function ItemTable({
       </div>
 
       <div className="overflow-x-auto rounded-md border border-hairline">
-        <table className="w-full min-w-[820px] border-collapse text-sm">
+        <table className="w-full min-w-[900px] border-collapse text-sm">
           <thead>
             <tr className="border-b border-hairline bg-surface-soft text-left text-xs font-semibold uppercase tracking-[0.04em] text-muted">
               <th className="px-3 py-3">Description</th>
               <th className="w-24 px-3 py-3 text-right">Qty</th>
+              <th className="w-28 px-3 py-3 text-right">Unit</th>
               <th className="w-32 px-3 py-3 text-right">Unit price</th>
               <th className="w-24 px-3 py-3 text-right">GST %</th>
               <th className="w-32 px-3 py-3 text-right">Discount</th>
@@ -69,6 +70,20 @@ export function ItemTable({
                     }
                     aria-label="Quantity"
                   />
+                </td>
+                <td className="px-3 py-3">
+                  <Select
+                    className="h-11 py-0 pl-2 pr-8 text-sm text-right"
+                    value={item.unit}
+                    onChange={(event) =>
+                      onChange(item.id, { unit: event.target.value })
+                    }
+                    aria-label="Unit"
+                  >
+                    <option value="CUM">CUM</option>
+                    <option value="PCS">PCS</option>
+                    <option value="BAG">BAG</option>
+                  </Select>
                 </td>
                 <td className="px-3 py-3">
                   <Input
