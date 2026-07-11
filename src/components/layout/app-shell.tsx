@@ -28,10 +28,19 @@ export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Don't render the app shell on the login page
   if (pathname === "/login") {
     return <>{children}</>;
+  }
+
+  if (!mounted) {
+    return null;
   }
 
   async function handleLogout() {

@@ -15,7 +15,7 @@ export const defaultCompany: CompanyDetails = {
   name: "OMM ECO BUILDTECH",
   address: "Ramdaspur Industrial Estate, Office - Trisulia, Dist - Cuttack, State - Odisha, 754005",
   gstNumber: "21AAGF03736M1Z6",
-  phone: "+91 70777 03202",
+  phone: "+91 97771 03202",
   email: "info@ommecobuildtech.in",
   website: "www.ommecobuildtech.in",
 };
