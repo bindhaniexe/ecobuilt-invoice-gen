@@ -58,7 +58,7 @@ export const invoiceTotalsSchema = z.object({
   amountInWords: z.string(),
 });
 
-export const invoiceTypeSchema = z.enum(["tax-invoice", "proforma"]);
+export const invoiceTypeSchema = z.enum(["tax-invoice", "proforma", "quotation"]);
 
 export const invoiceSchema = z.object({
   id: z.string().min(1),
@@ -79,6 +79,22 @@ export const invoiceSchema = z.object({
   totals: invoiceTotalsSchema,
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
+  // Quotation specific fields
+  dispatchSite: z.string().optional(),
+  quotationSubject: z.string().optional(),
+  selectedBreadths: z.array(z.string()).optional(),
+  gstBlocks: z.coerce.number().optional(),
+  gstAdhesive: z.coerce.number().optional(),
+  paymentPercentage: z.coerce.number().optional(),
+  transportScope: z.string().optional(),
+  aacBlocksPrice: z.coerce.number().optional(),
+  adhesivePrice: z.coerce.number().optional(),
+  freightChargesText: z.string().optional(),
+  deliveryTermsText: z.string().optional(),
+  otherTermsText: z.string().optional(),
+  jurisdictionText: z.string().optional(),
+  contactName: z.string().optional(),
+  contactPhone: z.string().optional(),
 });
 
 export const customerListSchema: z.ZodType<Customer[]> = z.array(customerSchema);

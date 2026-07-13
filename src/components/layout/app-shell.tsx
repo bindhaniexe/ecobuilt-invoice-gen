@@ -17,6 +17,7 @@ import React, { type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Invoice } from "@/domain/invoices/types";
+import { getInvoiceTypeLabel } from "@/domain/invoices/document-type";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -149,7 +150,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         ...allInvoices.map((inv: Invoice) => {
           const row = [
             inv.invoiceNumber,
-            inv.invoiceType === "proforma" ? "Proforma" : "Tax Invoice",
+            getInvoiceTypeLabel(inv.invoiceType),
             inv.issueDate,
             `"${(inv.customerSnapshot.name || "Manual").replace(/"/g, '""')}"`,
             inv.customerSnapshot.gstNumber || "-",

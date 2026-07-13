@@ -27,6 +27,11 @@ import {
   defaultCompany,
   OMM_BANK_DETAILS,
 } from "@/domain/invoices/factories";
+import {
+  getInvoiceTypeLabel,
+  isConvertibleToTaxInvoice,
+  parseInvoiceTypeParam,
+} from "@/domain/invoices/document-type";
 import { generateInvoiceNumber } from "@/domain/invoices/numbering";
 import { invoiceSchema } from "@/domain/invoices/schemas";
 import type {
@@ -113,9 +118,11 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
             );
           }
         } else {
-          const typeParam = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("type") === "proforma"
-            ? "proforma"
-            : "tax-invoice";
+          const typeParam = parseInvoiceTypeParam(
+            typeof window !== "undefined"
+              ? new URLSearchParams(window.location.search).get("type")
+              : undefined,
+          );
           if (!cancelled) setInvoice(createInvoiceDraft(existing, typeParam));
         }
       } catch (error) {
@@ -414,7 +421,7 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
                 Live preview stays aligned with the A4 export target.
               </p>
             </div>
-            {invoice.invoiceType === "proforma" ? (
+            {isConvertibleToTaxInvoice(invoice.invoiceType) ? (
               <div className="flex flex-wrap gap-3">
                 <Button
                   type="button"
@@ -455,12 +462,12 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
             {message}
           </div>
         ) : null}
-        {invoice.invoiceType === "proforma" && (
+        {isConvertibleToTaxInvoice(invoice.invoiceType) && (
           <div className="mt-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 rounded-md border border-[#fbbf24] bg-[#fffbeb] p-4 text-sm text-[#92400e]">
             <div className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-[#d97706] shrink-0" aria-hidden="true" />
               <span>
-                This is a <strong>Proforma Invoice</strong> (Quote/Estimate). It uses prefix <code>PI-</code>, does not increment official tax sequence numbers, and is excluded from actual revenue dashboard analytics.
+                This is a <strong>{getInvoiceTypeLabel(invoice.invoiceType, "long")}</strong>. It uses prefix <code>{invoice.invoiceType === "quotation" ? "QT-" : "PI-"}</code>, does not increment official tax sequence numbers, and is excluded from actual revenue dashboard analytics.
               </span>
             </div>
             <Button
@@ -493,328 +500,692 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
 
       <div className="app-section flex min-w-0 flex-col gap-6">
         <div className="no-print min-w-0 space-y-6">
-          <section className="section-panel p-5 md:p-6">
-            <SectionHeading title="Invoice details" />
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Invoice type" htmlFor="invoice-type">
-                <Select
-                  id="invoice-type"
-                  value={invoice.invoiceType}
-                  onChange={(event) => {
-                    const nextType = event.target.value as InvoiceType;
-                    updateInvoice((current) => {
-                      const generatedNum = generateInvoiceNumber(
-                        new Date(current.issueDate),
-                        existingInvoiceNumbers,
-                        nextType
-                      );
-                      return {
-                        ...current,
-                        invoiceType: nextType,
-                        invoiceNumber: generatedNum,
-                      };
-                    });
-                  }}
-                >
-                  <option value="tax-invoice">Tax Invoice</option>
-                  <option value="proforma">Proforma Invoice</option>
-                </Select>
-              </Field>
-              <Field label="Invoice number" htmlFor="invoice-number">
-                <Input
-                  id="invoice-number"
-                  value={invoice.invoiceNumber}
-                  onChange={(event) =>
-                    updateInvoice((current) => ({
-                      ...current,
-                      invoiceNumber: event.target.value,
-                    }))
-                  }
-                />
-              </Field>
-              <Field label="Invoice date" htmlFor="issue-date">
-                <Input
-                  id="issue-date"
-                  type="date"
-                  value={invoice.issueDate}
-                  onChange={(event) =>
-                    updateInvoice((current) => ({
-                      ...current,
-                      issueDate: event.target.value,
-                    }))
-                  }
-                />
-              </Field>
-              <Field label="Payment method" htmlFor="payment-method">
-                <Select
-                  id="payment-method"
-                  value={invoice.paymentMethod}
-                  onChange={(event) =>
-                    updateInvoice((current) => ({
-                      ...current,
-                      paymentMethod: event.target.value as PaymentMethod,
-                    }))
-                  }
-                >
-                  {paymentMethods.map((method) => (
-                    <option key={method.value} value={method.value}>
-                      {method.label}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Payment status" htmlFor="payment-status">
-                <Select
-                  id="payment-status"
-                  value={invoice.paymentStatus}
-                  onChange={(event) =>
-                    updateInvoice((current) => ({
-                      ...current,
-                      paymentStatus: event.target.value as PaymentStatus,
-                    }))
-                  }
-                >
-                  {paymentStatuses.map((status) => (
-                    <option key={status.value} value={status.value}>
-                      {status.label}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Amount paid" htmlFor="amount-paid">
-                <Input
-                  id="amount-paid"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={invoice.amountPaid}
-                  onChange={(event) =>
-                    updateInvoice((current) => ({
-                      ...current,
-                      amountPaid: Number(event.target.value),
-                    }))
-                  }
-                />
-              </Field>
-              <div className="rounded-md border border-hairline bg-surface-soft p-4">
-                <p className="text-sm text-muted">Balance due</p>
-                <p className="mt-2 text-[22px] font-semibold text-ink">
-                  {formatCurrency(invoice.totals.balanceDue)}
-                </p>
-              </div>
-            </div>
-          </section>
+          {invoice.invoiceType === "quotation" ? (
+            <>
+              {/* Quotation Details Section */}
+              <section className="section-panel p-5 md:p-6">
+                <SectionHeading title="Quotation details" />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field label="Document type" htmlFor="invoice-type">
+                    <Select
+                      id="invoice-type"
+                      value={invoice.invoiceType}
+                      onChange={(event) => {
+                        const nextType = event.target.value as InvoiceType;
+                        updateInvoice((current) => {
+                          const generatedNum = generateInvoiceNumber(
+                            new Date(current.issueDate),
+                            existingInvoiceNumbers,
+                            nextType
+                          );
+                          return {
+                            ...current,
+                            invoiceType: nextType,
+                            invoiceNumber: generatedNum,
+                          };
+                        });
+                      }}
+                    >
+                      <option value="tax-invoice">Tax Invoice</option>
+                      <option value="proforma">Proforma Invoice</option>
+                      <option value="quotation">Quotation</option>
+                    </Select>
+                  </Field>
+                  <Field label="Quotation number" htmlFor="invoice-number">
+                    <Input
+                      id="invoice-number"
+                      value={invoice.invoiceNumber}
+                      onChange={(event) =>
+                        updateInvoice((current) => ({
+                          ...current,
+                          invoiceNumber: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+                  <Field label="Quotation date" htmlFor="issue-date">
+                    <Input
+                      id="issue-date"
+                      type="date"
+                      value={invoice.issueDate}
+                      onChange={(event) =>
+                        updateInvoice((current) => ({
+                          ...current,
+                          issueDate: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+                  <Field label="Dispatch Site" htmlFor="dispatch-site">
+                    <Input
+                      id="dispatch-site"
+                      value={invoice.dispatchSite ?? ""}
+                      placeholder="Balugaon, Bhubaneswar"
+                      onChange={(event) =>
+                        updateInvoice((current) => ({
+                          ...current,
+                          dispatchSite: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+                  <div className="md:col-span-2">
+                    <Field label="Quotation Subject" htmlFor="quotation-subject">
+                      <Input
+                        id="quotation-subject"
+                        value={invoice.quotationSubject ?? ""}
+                        placeholder="Quotation of Autoclaved Aerated Concrete (AAC Blocks) & Adhesive."
+                        onChange={(event) =>
+                          updateInvoice((current) => ({
+                            ...current,
+                            quotationSubject: event.target.value,
+                          }))
+                        }
+                      />
+                    </Field>
+                  </div>
+                  <Field label="Contact Person" htmlFor="contact-name">
+                    <Input
+                      id="contact-name"
+                      value={invoice.contactName ?? ""}
+                      placeholder="Surya Pratap Mohanty"
+                      onChange={(event) =>
+                        updateInvoice((current) => ({
+                          ...current,
+                          contactName: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+                  <Field label="Contact Phone" htmlFor="contact-phone">
+                    <Input
+                      id="contact-phone"
+                      value={invoice.contactPhone ?? ""}
+                      placeholder="9777103202"
+                      onChange={(event) =>
+                        updateInvoice((current) => ({
+                          ...current,
+                          contactPhone: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+                  <Field label="Company seal URL (optional)" htmlFor="seal-url">
+                    <Input
+                      id="seal-url"
+                      value={invoice.sealUrl ?? ""}
+                      onChange={(event) =>
+                        updateInvoice((current) => ({
+                          ...current,
+                          sealUrl: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+                </div>
+              </section>
 
-          <section className="section-panel p-5 md:p-6 bg-surface-soft/30">
-            <div className="flex items-center justify-between mb-4 pb-2 border-b border-hairline">
-              <h2 className="text-lg font-semibold text-ink">Company Details (Hardcoded)</h2>
-              <span className="text-[11px] font-semibold bg-[#edf7ed] text-[#245536] border border-[#b7e4c7] px-2 py-0.5 rounded-full uppercase tracking-wider">
-                Locked
-              </span>
-            </div>
-            
-            <div className="grid gap-4 md:grid-cols-2 text-sm">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted">Company Name</p>
-                <p className="mt-1 font-semibold text-ink">{defaultCompany.name}</p>
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted">GST Number</p>
-                <p className="mt-1 font-mono font-semibold text-ink">{defaultCompany.gstNumber}</p>
-              </div>
-              <div className="md:col-span-2">
-                <p className="text-xs font-bold uppercase tracking-wider text-muted">Address</p>
-                <p className="mt-1 text-ink">{defaultCompany.address}</p>
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted">Phone</p>
-                <p className="mt-1 text-ink">{defaultCompany.phone}</p>
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted">Email</p>
-                <p className="mt-1 text-ink">{defaultCompany.email}</p>
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted">Website</p>
-                <p className="mt-1 text-ink">{defaultCompany.website}</p>
-              </div>
-              <div className="md:col-span-2 mt-2 pt-3 border-t border-hairline-soft">
-                <p className="text-xs font-bold uppercase tracking-wider text-muted mb-2">Hardcoded Bank Account Details</p>
-                <div className="grid gap-2 grid-cols-2 md:grid-cols-3 bg-white p-3 rounded border border-hairline">
+              {/* Customer Details Section */}
+              <section className="section-panel p-5 md:p-6">
+                <SectionHeading title="Customer details" />
+                <Field label="Select saved customer" htmlFor="customer-select">
+                  <Select
+                    id="customer-select"
+                    value={invoice.customerId ?? "manual"}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      if (value === "manual") {
+                        updateInvoice((current) => ({
+                          ...current,
+                          customerId: undefined,
+                        }));
+                        return;
+                      }
+                      const customer = customers.find((record) => record.id === value);
+                      if (!customer) return;
+                      updateInvoice((current) => ({
+                        ...current,
+                        customerId: customer.id,
+                        customerSnapshot: {
+                          name: customer.name,
+                          address: customer.address,
+                          gstNumber: customer.gstNumber,
+                          phone: customer.phone,
+                          email: customer.email,
+                        },
+                      }));
+                    }}
+                  >
+                    <option value="manual">Manual customer</option>
+                    {customers.map((customer) => (
+                      <option key={customer.id} value={customer.id}>
+                        {customer.name}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <div className="mt-4">
+                  <DetailsFields
+                    details={invoice.customerSnapshot}
+                    onChange={(customerSnapshot) =>
+                      updateInvoice((current) => ({
+                        ...current,
+                        customerSnapshot,
+                      }))
+                    }
+                  />
+                </div>
+              </section>
+
+              {/* Quotation Pricing & Terms Section */}
+              <section className="section-panel p-5 md:p-6">
+                <SectionHeading title="Quotation Pricing & Terms" />
+                <div className="space-y-6">
                   <div>
-                    <span className="text-xs text-muted block">Bank Name</span>
-                    <span className="font-semibold text-ink text-xs">{OMM_BANK_DETAILS.bankName}</span>
+                    <span className="text-sm font-semibold text-ink block mb-2">Breadth of the size</span>
+                    <div className="flex flex-wrap gap-4 p-3 bg-surface-soft border border-hairline rounded-lg">
+                      {["75", "100", "125", "150", "200", "250"].map((b) => {
+                        const currentSelected = invoice.selectedBreadths || ["75", "125", "150", "250"];
+                        return (
+                          <label key={b} className="flex items-center gap-2 text-sm text-ink cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={currentSelected.includes(b)}
+                              className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                const nextSelected = checked
+                                  ? [...currentSelected, b].sort((x, y) => Number(x) - Number(y))
+                                  : currentSelected.filter((x) => x !== b);
+                                updateInvoice((current) => ({
+                                  ...current,
+                                  selectedBreadths: nextSelected,
+                                }));
+                              }}
+                            />
+                            <span>{b} MM</span>
+                          </label>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-xs text-muted block">Account Name</span>
-                    <span className="font-semibold text-ink text-xs">{OMM_BANK_DETAILS.accountName}</span>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label="AAC Blocks Price (Per CUM)" htmlFor="aac-blocks-price">
+                      <Input
+                        id="aac-blocks-price"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={invoice.aacBlocksPrice ?? 3300}
+                        onChange={(event) =>
+                          updateInvoice((current) => ({
+                            ...current,
+                            aacBlocksPrice: Number(event.target.value),
+                          }))
+                        }
+                      />
+                    </Field>
+                    <Field label="Adhesive Price (Per BAG)" htmlFor="adhesive-price">
+                      <Input
+                        id="adhesive-price"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={invoice.adhesivePrice ?? 466.10}
+                        onChange={(event) =>
+                          updateInvoice((current) => ({
+                            ...current,
+                            adhesivePrice: Number(event.target.value),
+                          }))
+                        }
+                      />
+                    </Field>
+                    <Field label="GST on AAC Blocks" htmlFor="gst-blocks">
+                      <Select
+                        id="gst-blocks"
+                        value={invoice.gstBlocks ?? 12}
+                        onChange={(event) =>
+                          updateInvoice((current) => ({
+                            ...current,
+                            gstBlocks: Number(event.target.value),
+                          }))
+                        }
+                      >
+                        <option value="12">12%</option>
+                        <option value="18">18%</option>
+                      </Select>
+                    </Field>
+                    <Field label="GST on Adhesive" htmlFor="gst-adhesive">
+                      <Select
+                        id="gst-adhesive"
+                        value={invoice.gstAdhesive ?? 18}
+                        onChange={(event) =>
+                          updateInvoice((current) => ({
+                            ...current,
+                            gstAdhesive: Number(event.target.value),
+                          }))
+                        }
+                      >
+                        <option value="12">12%</option>
+                        <option value="18">18%</option>
+                      </Select>
+                    </Field>
+                    <Field label="Payment Term (Advance)" htmlFor="payment-percentage">
+                      <Select
+                        id="payment-percentage"
+                        value={invoice.paymentPercentage ?? 100}
+                        onChange={(event) =>
+                          updateInvoice((current) => ({
+                            ...current,
+                            paymentPercentage: Number(event.target.value),
+                          }))
+                        }
+                      >
+                        <option value="20">20%</option>
+                        <option value="40">40%</option>
+                        <option value="60">60%</option>
+                        <option value="80">80%</option>
+                        <option value="100">100%</option>
+                      </Select>
+                    </Field>
+                    <Field label="Transport" htmlFor="transport-scope">
+                      <Select
+                        id="transport-scope"
+                        value={invoice.transportScope ?? "Our Scope"}
+                        onChange={(event) =>
+                          updateInvoice((current) => ({
+                            ...current,
+                            transportScope: event.target.value,
+                          }))
+                        }
+                      >
+                        <option value="Our Scope">Our Scope</option>
+                        <option value="Your Scope">Your Scope</option>
+                      </Select>
+                    </Field>
                   </div>
-                  <div>
-                    <span className="text-xs text-muted block">Account Number</span>
-                    <span className="font-bold text-ink text-xs">{OMM_BANK_DETAILS.accountNumber}</span>
-                  </div>
-                  <div>
-                    <span className="text-xs text-muted block">IFSC Code</span>
-                    <span className="font-bold text-ink text-xs">{OMM_BANK_DETAILS.ifscCode}</span>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="text-xs text-muted block">Branch</span>
-                    <span className="font-semibold text-ink text-xs">{OMM_BANK_DETAILS.branch}</span>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label="Freight Charges" htmlFor="freight-charges-text">
+                      <Textarea
+                        id="freight-charges-text"
+                        value={invoice.freightChargesText ?? ""}
+                        onChange={(event) =>
+                          updateInvoice((current) => ({
+                            ...current,
+                            freightChargesText: event.target.value,
+                          }))
+                        }
+                      />
+                    </Field>
+                    <Field label="Delivery Terms" htmlFor="delivery-terms-text">
+                      <Textarea
+                        id="delivery-terms-text"
+                        value={invoice.deliveryTermsText ?? ""}
+                        onChange={(event) =>
+                          updateInvoice((current) => ({
+                            ...current,
+                            deliveryTermsText: event.target.value,
+                          }))
+                        }
+                      />
+                    </Field>
+                    <Field label="Other Terms & Conditions" htmlFor="other-terms-text">
+                      <Textarea
+                        id="other-terms-text"
+                        value={invoice.otherTermsText ?? ""}
+                        onChange={(event) =>
+                          updateInvoice((current) => ({
+                            ...current,
+                            otherTermsText: event.target.value,
+                          }))
+                        }
+                      />
+                    </Field>
+                    <Field label="Jurisdiction" htmlFor="jurisdiction-text">
+                      <Textarea
+                        id="jurisdiction-text"
+                        value={invoice.jurisdictionText ?? ""}
+                        onChange={(event) =>
+                          updateInvoice((current) => ({
+                            ...current,
+                            jurisdictionText: event.target.value,
+                          }))
+                        }
+                      />
+                    </Field>
                   </div>
                 </div>
-              </div>
-            </div>
-          </section>
+              </section>
+            </>
+          ) : (
+            <>
+              <section className="section-panel p-5 md:p-6">
+                <SectionHeading title="Invoice details" />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field label="Invoice type" htmlFor="invoice-type">
+                    <Select
+                      id="invoice-type"
+                      value={invoice.invoiceType}
+                      onChange={(event) => {
+                        const nextType = event.target.value as InvoiceType;
+                        updateInvoice((current) => {
+                          const generatedNum = generateInvoiceNumber(
+                            new Date(current.issueDate),
+                            existingInvoiceNumbers,
+                            nextType
+                          );
+                          return {
+                            ...current,
+                            invoiceType: nextType,
+                            invoiceNumber: generatedNum,
+                          };
+                        });
+                      }}
+                    >
+                      <option value="tax-invoice">Tax Invoice</option>
+                      <option value="proforma">Proforma Invoice</option>
+                      <option value="quotation">Quotation</option>
+                    </Select>
+                  </Field>
+                  <Field label="Invoice number" htmlFor="invoice-number">
+                    <Input
+                      id="invoice-number"
+                      value={invoice.invoiceNumber}
+                      onChange={(event) =>
+                        updateInvoice((current) => ({
+                          ...current,
+                          invoiceNumber: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+                  <Field label="Invoice date" htmlFor="issue-date">
+                    <Input
+                      id="issue-date"
+                      type="date"
+                      value={invoice.issueDate}
+                      onChange={(event) =>
+                        updateInvoice((current) => ({
+                          ...current,
+                          issueDate: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+                  <Field label="Payment method" htmlFor="payment-method">
+                    <Select
+                      id="payment-method"
+                      value={invoice.paymentMethod}
+                      onChange={(event) =>
+                        updateInvoice((current) => ({
+                          ...current,
+                          paymentMethod: event.target.value as PaymentMethod,
+                        }))
+                      }
+                    >
+                      {paymentMethods.map((method) => (
+                        <option key={method.value} value={method.value}>
+                          {method.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field label="Payment status" htmlFor="payment-status">
+                    <Select
+                      id="payment-status"
+                      value={invoice.paymentStatus}
+                      onChange={(event) =>
+                        updateInvoice((current) => ({
+                          ...current,
+                          paymentStatus: event.target.value as PaymentStatus,
+                        }))
+                      }
+                    >
+                      {paymentStatuses.map((status) => (
+                        <option key={status.value} value={status.value}>
+                          {status.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field label="Amount paid" htmlFor="amount-paid">
+                    <Input
+                      id="amount-paid"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={invoice.amountPaid}
+                      onChange={(event) =>
+                        updateInvoice((current) => ({
+                          ...current,
+                          amountPaid: Number(event.target.value),
+                        }))
+                      }
+                    />
+                  </Field>
+                  <div className="rounded-md border border-hairline bg-surface-soft p-4">
+                    <p className="text-sm text-muted">Balance due</p>
+                    <p className="mt-2 text-[22px] font-semibold text-ink">
+                      {formatCurrency(invoice.totals.balanceDue)}
+                    </p>
+                  </div>
+                </div>
+              </section>
 
-          <section className="section-panel p-5 md:p-6">
-            <SectionHeading title="Customer details" />
-            <Field label="Select saved customer" htmlFor="customer-select">
-              <Select
-                id="customer-select"
-                value={invoice.customerId ?? "manual"}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  if (value === "manual") {
-                    updateInvoice((current) => ({
-                      ...current,
-                      customerId: undefined,
-                    }));
-                    return;
-                  }
-                  const customer = customers.find((record) => record.id === value);
-                  if (!customer) return;
-                  updateInvoice((current) => ({
-                    ...current,
-                    customerId: customer.id,
-                    customerSnapshot: {
-                      name: customer.name,
-                      address: customer.address,
-                      gstNumber: customer.gstNumber,
-                      phone: customer.phone,
-                      email: customer.email,
-                    },
-                  }));
-                }}
-              >
-                <option value="manual">Manual customer</option>
-                {customers.map((customer) => (
-                  <option key={customer.id} value={customer.id}>
-                    {customer.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <div className="mt-4">
-              <DetailsFields
-                details={invoice.customerSnapshot}
-                onChange={(customerSnapshot) =>
-                  updateInvoice((current) => ({
-                    ...current,
-                    customerSnapshot,
-                  }))
-                }
-              />
-            </div>
-          </section>
+              <section className="section-panel p-5 md:p-6 bg-surface-soft/30">
+                <div className="flex items-center justify-between mb-4 pb-2 border-b border-hairline">
+                  <h2 className="text-lg font-semibold text-ink">Company Details (Hardcoded)</h2>
+                  <span className="text-[11px] font-semibold bg-[#edf7ed] text-[#245536] border border-[#b7e4c7] px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    Locked
+                  </span>
+                </div>
+                
+                <div className="grid gap-4 md:grid-cols-2 text-sm">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted">Company Name</p>
+                    <p className="mt-1 font-semibold text-ink">{defaultCompany.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted">GST Number</p>
+                    <p className="mt-1 font-mono font-semibold text-ink">{defaultCompany.gstNumber}</p>
+                  </div>
+                  <div className="md:col-span-2">
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted">Address</p>
+                    <p className="mt-1 text-ink">{defaultCompany.address}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted">Phone</p>
+                    <p className="mt-1 text-ink">{defaultCompany.phone}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted">Email</p>
+                    <p className="mt-1 text-ink">{defaultCompany.email}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted">Website</p>
+                    <p className="mt-1 text-ink">{defaultCompany.website}</p>
+                  </div>
+                  <div className="md:col-span-2 mt-2 pt-3 border-t border-hairline-soft">
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted mb-2">Hardcoded Bank Account Details</p>
+                    <div className="grid gap-2 grid-cols-2 md:grid-cols-3 bg-white p-3 rounded border border-hairline">
+                      <div>
+                        <span className="text-xs text-muted block">Bank Name</span>
+                        <span className="font-semibold text-ink text-xs">{OMM_BANK_DETAILS.bankName}</span>
+                      </div>
+                      <div>
+                        <span className="text-xs text-muted block">Account Name</span>
+                        <span className="font-semibold text-ink text-xs">{OMM_BANK_DETAILS.accountName}</span>
+                      </div>
+                      <div>
+                        <span className="text-xs text-muted block">Account Number</span>
+                        <span className="font-bold text-ink text-xs">{OMM_BANK_DETAILS.accountNumber}</span>
+                      </div>
+                      <div>
+                        <span className="text-xs text-muted block">IFSC Code</span>
+                        <span className="font-bold text-ink text-xs">{OMM_BANK_DETAILS.ifscCode}</span>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-xs text-muted block">Branch</span>
+                        <span className="font-semibold text-ink text-xs">{OMM_BANK_DETAILS.branch}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
 
-          <section className="section-panel p-5 md:p-6">
-            <ItemTable
-              items={invoice.items}
-              onAdd={() =>
-                updateInvoice((current) => ({
-                  ...current,
-                  items: [...current.items, createInvoiceItem()],
-                }))
-              }
-              onDuplicate={(itemId) =>
-                updateInvoice((current) => {
-                  const source = current.items.find((item) => item.id === itemId);
-                  if (!source) return current;
-                  return {
-                    ...current,
-                    items: [
-                      ...current.items,
-                      {
-                        ...source,
-                        id: createId("item"),
-                      },
-                    ],
-                  };
-                })
-              }
-              onDelete={(itemId) =>
-                updateInvoice((current) => ({
-                  ...current,
-                  items:
-                    current.items.length === 1
-                      ? current.items
-                      : current.items.filter((item) => item.id !== itemId),
-                }))
-              }
-              onChange={(itemId, updates) =>
-                updateInvoice((current) => ({
-                  ...current,
-                  items: current.items.map((item) =>
-                    item.id === itemId ? { ...item, ...updates } : item,
-                  ),
-                }))
-              }
-            />
-          </section>
+              <section className="section-panel p-5 md:p-6">
+                <SectionHeading title="Customer details" />
+                <Field label="Select saved customer" htmlFor="customer-select">
+                  <Select
+                    id="customer-select"
+                    value={invoice.customerId ?? "manual"}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      if (value === "manual") {
+                        updateInvoice((current) => ({
+                          ...current,
+                          customerId: undefined,
+                        }));
+                        return;
+                      }
+                      const customer = customers.find((record) => record.id === value);
+                      if (!customer) return;
+                      updateInvoice((current) => ({
+                        ...current,
+                        customerId: customer.id,
+                        customerSnapshot: {
+                          name: customer.name,
+                          address: customer.address,
+                          gstNumber: customer.gstNumber,
+                          phone: customer.phone,
+                          email: customer.email,
+                        },
+                      }));
+                    }}
+                  >
+                    <option value="manual">Manual customer</option>
+                    {customers.map((customer) => (
+                      <option key={customer.id} value={customer.id}>
+                        {customer.name}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <div className="mt-4">
+                  <DetailsFields
+                    details={invoice.customerSnapshot}
+                    onChange={(customerSnapshot) =>
+                      updateInvoice((current) => ({
+                        ...current,
+                        customerSnapshot,
+                      }))
+                    }
+                  />
+                </div>
+              </section>
 
-          <section className="section-panel p-5 md:p-6">
-            <SectionHeading title="Notes and signature" />
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Terms and conditions" htmlFor="terms">
-                <Textarea
-                  id="terms"
-                  value={invoice.terms}
-                  onChange={(event) =>
+              <section className="section-panel p-5 md:p-6">
+                <ItemTable
+                  items={invoice.items}
+                  onAdd={() =>
                     updateInvoice((current) => ({
                       ...current,
-                      terms: event.target.value,
+                      items: [...current.items, createInvoiceItem()],
+                    }))
+                  }
+                  onDuplicate={(itemId) =>
+                    updateInvoice((current) => {
+                      const source = current.items.find((item) => item.id === itemId);
+                      if (!source) return current;
+                      return {
+                        ...current,
+                        items: [
+                          ...current.items,
+                          {
+                            ...source,
+                            id: createId("item"),
+                          },
+                        ],
+                      };
+                    })
+                  }
+                  onDelete={(itemId) =>
+                    updateInvoice((current) => ({
+                      ...current,
+                      items:
+                        current.items.length === 1
+                          ? current.items
+                          : current.items.filter((item) => item.id !== itemId),
+                    }))
+                  }
+                  onChange={(itemId, updates) =>
+                    updateInvoice((current) => ({
+                      ...current,
+                      items: current.items.map((item) =>
+                        item.id === itemId ? { ...item, ...updates } : item,
+                      ),
                     }))
                   }
                 />
-              </Field>
-              <Field label="Additional notes" htmlFor="notes">
-                <Textarea
-                  id="notes"
-                  value={invoice.notes}
-                  onChange={(event) =>
-                    updateInvoice((current) => ({
-                      ...current,
-                      notes: event.target.value,
-                    }))
-                  }
-                />
-              </Field>
-              <Field label="Signature name" htmlFor="signature">
-                <Input
-                  id="signature"
-                  value={invoice.signature}
-                  onChange={(event) =>
-                    updateInvoice((current) => ({
-                      ...current,
-                      signature: event.target.value,
-                    }))
-                  }
-                />
-              </Field>
-              <Field label="Company seal URL (optional)" htmlFor="seal-url">
-                <Input
-                  id="seal-url"
-                  value={invoice.sealUrl ?? ""}
-                  onChange={(event) =>
-                    updateInvoice((current) => ({
-                      ...current,
-                      sealUrl: event.target.value,
-                    }))
-                  }
-                />
-              </Field>
-            </div>
-          </section>
+              </section>
+
+              <section className="section-panel p-5 md:p-6">
+                <SectionHeading title="Notes and signature" />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field label="Terms and conditions" htmlFor="terms">
+                    <Textarea
+                      id="terms"
+                      value={invoice.terms}
+                      onChange={(event) =>
+                        updateInvoice((current) => ({
+                          ...current,
+                          terms: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+                  <Field label="Additional notes" htmlFor="notes">
+                    <Textarea
+                      id="notes"
+                      value={invoice.notes}
+                      onChange={(event) =>
+                        updateInvoice((current) => ({
+                          ...current,
+                          notes: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+                  <Field label="Signature name" htmlFor="signature">
+                    <Input
+                      id="signature"
+                      value={invoice.signature}
+                      onChange={(event) =>
+                        updateInvoice((current) => ({
+                          ...current,
+                          signature: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+                  <Field label="Company seal URL (optional)" htmlFor="seal-url">
+                    <Input
+                      id="seal-url"
+                      value={invoice.sealUrl ?? ""}
+                      onChange={(event) =>
+                        updateInvoice((current) => ({
+                          ...current,
+                          sealUrl: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+                </div>
+              </section>
+            </>
+          )}
         </div>
 
         <aside className="min-w-0 max-w-full">

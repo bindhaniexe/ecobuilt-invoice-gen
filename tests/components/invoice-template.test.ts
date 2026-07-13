@@ -1,8 +1,13 @@
+import React from "react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { createInvoiceDraft, createInvoiceItem } from "@/domain/invoices/factories";
-import { recalculateInvoice } from "@/domain/invoices/factories";
-import { paginateInvoiceItems } from "@/components/invoices/invoice-template";
+import { InvoicePreview, paginateInvoiceItems } from "@/components/invoices/invoice-template";
+import {
+  createInvoiceDraft,
+  createInvoiceItem,
+  recalculateInvoice,
+} from "@/domain/invoices/factories";
 
 describe("paginateInvoiceItems", () => {
   it("keeps short invoices on one A4 page", () => {
@@ -24,5 +29,14 @@ describe("paginateInvoiceItems", () => {
       12,
       1,
     ]);
+  });
+
+  it("renders quotation documents with the quotation title", () => {
+    const invoice = createInvoiceDraft([], "quotation");
+
+    render(React.createElement(InvoicePreview, { invoice, printRef: { current: null } }));
+
+    expect(screen.getByRole("heading", { name: "Quotation" })).toBeInTheDocument();
+    expect(screen.getByText(/^QT-/)).toBeInTheDocument();
   });
 });

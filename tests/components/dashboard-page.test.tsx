@@ -1,6 +1,5 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
@@ -18,12 +17,9 @@ describe("DashboardPage", () => {
   });
 
   it("loads and deletes an invoice successfully", async () => {
-    const user = userEvent.setup();
-
-    // Create an invoice programmatically in localStorage
     const repo = createLocalStorageInvoiceRepository(window.localStorage);
     const draft = createInvoiceDraft([]);
-    const saved = await repo.create(
+    await repo.create(
       recalculateInvoice({
         ...draft,
         invoiceNumber: "INV-9999",
@@ -34,28 +30,64 @@ describe("DashboardPage", () => {
           phone: "9999999999",
           email: "client@test.com",
         },
-      })
+      }),
     );
 
     render(<DashboardPage />);
 
-    // Wait for the invoice to be loaded and listed
-    await waitFor(() => {
-      expect(screen.getAllByText("INV-9999").length).toBeGreaterThanOrEqual(1);
-      expect(screen.getAllByText("Test Client").length).toBeGreaterThanOrEqual(1);
-    }, { timeout: 25000 });
+    await waitFor(
+      () => {
+        expect(screen.getAllByText("INV-9999").length).toBeGreaterThanOrEqual(1);
+        expect(screen.getAllByText("Test Client").length).toBeGreaterThanOrEqual(1);
+      },
+      { timeout: 25000 },
+    );
 
-    // Locate and click the delete button
     const deleteButtons = screen.getAllByRole("button", { name: /Delete invoice/i });
     deleteButtons.forEach((btn) => fireEvent.click(btn));
 
-    // Verify confirmation dialog was triggered
     expect(window.confirm).toHaveBeenCalledWith("Delete this invoice?");
 
-    // Verify invoice was deleted and the list is now empty
     await waitFor(() => {
       expect(screen.queryAllByText("INV-9999").length).toBe(0);
       expect(screen.getAllByText(/No invoices yet/i).length).toBeGreaterThanOrEqual(1);
     });
+  });
+
+  it("converts a quotation to a tax invoice in place", async () => {
+    const repo = createLocalStorageInvoiceRepository(window.localStorage);
+    const saved = await repo.create(
+      recalculateInvoice({
+        ...createInvoiceDraft([], "quotation"),
+        invoiceNumber: "QT-2026-27-0001",
+        issueDate: "2026-07-10",
+        customerSnapshot: {
+          name: "Quote Client",
+          address: "123 Client St",
+          gstNumber: "27ABCDE1234F1Z5",
+          phone: "9999999999",
+          email: "client@test.com",
+        },
+      }),
+    );
+
+    render(<DashboardPage />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("QT-2026-27-0001").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("Quotation").length).toBeGreaterThanOrEqual(1);
+    });
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Convert to Tax Invoice/i })[0]);
+
+    await waitFor(async () => {
+      const converted = await repo.getById(saved.id);
+      expect(converted?.invoiceType).toBe("tax-invoice");
+      expect(converted?.invoiceNumber).toBe("INV-2026-27-0001");
+    });
+
+    expect(window.confirm).toHaveBeenCalledWith(
+      "Convert Quotation QT-2026-27-0001 to a Tax Invoice?",
+    );
   });
 });

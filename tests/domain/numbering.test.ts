@@ -32,4 +32,19 @@ describe("generateInvoiceNumber", () => {
 
     expect(number).toBe("PI-2026-27-0003");
   });
+
+  it("uses the QT prefix for quotations and handles sequence independently", () => {
+    const number = generateInvoiceNumber(
+      new Date("2026-07-10"),
+      [
+        "INV-2026-27-0005",
+        "PI-2026-27-0002",
+        "QT-2026-27-0001",
+        "QT-2026-27-0004",
+      ],
+      "quotation",
+    );
+
+    expect(number).toBe("QT-2026-27-0005");
+  });
 });

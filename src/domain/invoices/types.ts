@@ -1,4 +1,4 @@
-export type InvoiceType = "tax-invoice" | "proforma";
+export type InvoiceType = "tax-invoice" | "proforma" | "quotation";
 
 export type PaymentStatus = "draft" | "pending" | "paid" | "overdue";
 
@@ -80,6 +80,22 @@ export interface Invoice {
   totals: InvoiceTotals;
   createdAt: string;
   updatedAt: string;
+  // Quotation specific fields
+  dispatchSite?: string;
+  quotationSubject?: string;
+  selectedBreadths?: string[];
+  gstBlocks?: number;
+  gstAdhesive?: number;
+  paymentPercentage?: number;
+  transportScope?: string;
+  aacBlocksPrice?: number;
+  adhesivePrice?: number;
+  freightChargesText?: string;
+  deliveryTermsText?: string;
+  otherTermsText?: string;
+  jurisdictionText?: string;
+  contactName?: string;
+  contactPhone?: string;
 }
 
 export interface InvoiceFilters {

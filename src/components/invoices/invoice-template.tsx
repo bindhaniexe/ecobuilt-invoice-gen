@@ -1,8 +1,10 @@
 import type { RefObject } from "react";
 
 import type { Invoice, InvoiceItem } from "@/domain/invoices/types";
+import { getInvoiceTypeLabel } from "@/domain/invoices/document-type";
 import { defaultCompany, OMM_BANK_DETAILS } from "@/domain/invoices/factories";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { QuotationPreview } from "./quotation-template";
 
 const FIRST_PAGE_LIMIT = 8;
 const CONTINUATION_PAGE_LIMIT = 12;
@@ -28,6 +30,10 @@ export function InvoicePreview({
   invoice: Invoice;
   printRef: RefObject<HTMLDivElement | null>;
 }) {
+  if (invoice.invoiceType === "quotation") {
+    return <QuotationPreview invoice={invoice} printRef={printRef} />;
+  }
+
   const pages = paginateInvoiceItems(invoice.items);
 
   return (
@@ -88,7 +94,7 @@ export function InvoiceTemplate({
           </div>
           <div className="text-right">
             <h1 className="text-[28px] font-bold leading-none text-ink">
-              {invoice.invoiceType === "proforma" ? "Proforma Invoice" : "Tax Invoice"}
+              {getInvoiceTypeLabel(invoice.invoiceType, "long")}
             </h1>
             <p
               className="mt-3 px-4 py-2 text-[12px] font-semibold text-ink"

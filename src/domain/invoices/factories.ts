@@ -71,6 +71,35 @@ export function createInvoiceDraft(
   const items = [createInvoiceItem()];
   const totals = calculateInvoiceTotals(items, 0);
 
+  const notes =
+    type === "quotation"
+      ? "Thank you for the opportunity to quote."
+      : "Thank you for your business.";
+  const terms =
+    type === "quotation"
+      ? "This quotation is valid for 15 days from the issue date."
+      : type === "proforma"
+        ? "This proforma is an estimate only and is not a tax invoice."
+        : "Payment is due within 15 days from the invoice date.";
+
+  const quotationFields = type === "quotation" ? {
+    dispatchSite: "Balugaon, Bhubaneswar",
+    quotationSubject: "Quotation of Autoclaved Aerated Concrete (AAC Blocks) & Adhesive.",
+    selectedBreadths: ["75", "125", "150", "250"],
+    gstBlocks: 12,
+    gstAdhesive: 18,
+    paymentPercentage: 100,
+    transportScope: "Our Scope",
+    aacBlocksPrice: 3300,
+    adhesivePrice: 466.10,
+    freightChargesText: "Includes above mentioned Supply price. One truck of 25/30 MT carries approximately /33/40 M³ respectively.",
+    deliveryTermsText: "As per schedule to be provided by you at least 10 days before dispatch.",
+    otherTermsText: "Broken Blocks up to 3% on your account. Any breakages above 3% to be settled & Conditions by way of replacement/credit notes. Corner chippings shall not consider as breakages.",
+    jurisdictionText: "All disputes & cases shall be subject to Cuttack Jurisdiction only.",
+    contactName: "Surya Pratap Mohanty",
+    contactPhone: "9777103202",
+  } : {};
+
   return {
     id: createId("inv"),
     invoiceNumber: generateInvoiceNumber(new Date(issueDate), existingInvoiceNumbers, type),
@@ -82,12 +111,13 @@ export function createInvoiceDraft(
     company: defaultCompany,
     customerSnapshot: emptyCustomer,
     items,
-    notes: "Thank you for your business.",
-    terms: "Payment is due within 15 days from the invoice date.",
+    notes,
+    terms,
     signature: defaultCompany.name,
     totals,
     createdAt: now,
     updatedAt: now,
+    ...quotationFields,
   };
 }
 

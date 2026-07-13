@@ -15,7 +15,9 @@ export function getIndianFinancialYear(
   const prefix =
     type === "proforma"
       ? `PI-${startYear}-${endYearShort}`
-      : `INV-${startYear}-${endYearShort}`;
+      : type === "quotation"
+        ? `QT-${startYear}-${endYearShort}`
+        : `INV-${startYear}-${endYearShort}`;
 
   return {
     startYear,

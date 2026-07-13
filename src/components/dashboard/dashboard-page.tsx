@@ -18,6 +18,11 @@ import {
 import type { LucideIcon } from "lucide-react";
 
 import type { Invoice, InvoiceType, PaymentStatus } from "@/domain/invoices/types";
+import {
+  getInvoiceTypeLabel,
+  isConvertibleToTaxInvoice,
+  isRevenueInvoiceType,
+} from "@/domain/invoices/document-type";
 import { generateInvoiceNumber } from "@/domain/invoices/numbering";
 import { useInvoices } from "@/hooks/use-local-data";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -36,6 +41,16 @@ const statusOptions: Array<{ label: string; value: PaymentStatus | "all" }> = [
 
 function statusTone(status: PaymentStatus) {
   return status;
+}
+
+function invoiceTypeBadgeClass(type: InvoiceType): string {
+  if (type === "proforma") {
+    return "bg-[#faf5ff] text-[#6b21a8] border-[#e9d5ff]";
+  }
+  if (type === "quotation") {
+    return "bg-[#eff6ff] text-[#1d4ed8] border-[#bfdbfe]";
+  }
+  return "bg-[#f8fafc] text-[#475569] border-[#e2e8f0]";
 }
 
 /* ---------- Aging helpers ---------- */
@@ -58,7 +73,7 @@ function computeAgingBuckets(invoices: Invoice[]): AgingBucket[] {
     if (
       inv.paymentStatus === "paid" ||
       inv.paymentStatus === "draft" ||
-      inv.invoiceType === "proforma"
+      !isRevenueInvoiceType(inv.invoiceType)
     ) {
       continue;
     }
@@ -83,7 +98,7 @@ interface ClientRevenue {
 function computeTopClients(invoices: Invoice[], limit = 5): ClientRevenue[] {
   const map = new Map<string, number>();
   for (const inv of invoices) {
-    if (inv.invoiceType === "proforma") continue;
+    if (!isRevenueInvoiceType(inv.invoiceType)) continue;
     const name = inv.customerSnapshot.name || "Manual";
     map.set(name, (map.get(name) ?? 0) + inv.totals.grandTotal);
   }
@@ -98,7 +113,7 @@ function computeTopClients(invoices: Invoice[], limit = 5): ClientRevenue[] {
 export function DashboardPage() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<PaymentStatus | "all">("all");
-  const [typeFilter, setTypeFilter] = useState<"all" | "tax-invoice" | "proforma">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | InvoiceType>("all");
   const { invoices, loading, error, remove, reset, repository, refresh } = useInvoices({
     query,
     status,
@@ -107,17 +122,14 @@ export function DashboardPage() {
 
 
   const filteredInvoices = useMemo(() => {
-    return invoices.filter((inv) => {
-      if (typeFilter === "all") return true;
-      if (typeFilter === "tax-invoice") return inv.invoiceType !== "proforma";
-      return inv.invoiceType === "proforma";
-    });
+    return invoices.filter((inv) => typeFilter === "all" || inv.invoiceType === typeFilter);
   }, [invoices, typeFilter]);
 
   const stats = useMemo(() => {
     // Filter invoices by type first
-    const taxInvoices = invoices.filter((inv) => inv.invoiceType !== "proforma");
+    const taxInvoices = invoices.filter((inv) => isRevenueInvoiceType(inv.invoiceType));
     const proformaInvoices = invoices.filter((inv) => inv.invoiceType === "proforma");
+    const quotationInvoices = invoices.filter((inv) => inv.invoiceType === "quotation");
 
     const totalInvoiced = taxInvoices.reduce(
       (sum, inv) => sum + inv.totals.grandTotal,
@@ -136,8 +148,8 @@ export function DashboardPage() {
       0,
     );
 
-    // Proforma Pipeline (active/pending quotes)
-    const proformaPipeline = proformaInvoices.reduce(
+    // Quotation Pipeline (active/pending quotes)
+    const quotationPipeline = quotationInvoices.reduce(
       (sum, inv) => sum + inv.totals.balanceDue,
       0,
     );
@@ -148,7 +160,8 @@ export function DashboardPage() {
       outstanding,
       overdue,
       overdueCount: overdueInvoices.length,
-      proformaPipeline,
+      quotationPipeline,
+      quotationCount: quotationInvoices.length,
       proformaCount: proformaInvoices.length,
     };
   }, [invoices]);
@@ -177,6 +190,12 @@ export function DashboardPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
+          <Button asChild variant="secondary">
+            <Link href="/invoices/new?type=quotation">
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              New Quotation
+            </Link>
+          </Button>
           <Button asChild variant="secondary">
             <Link href="/invoices/new?type=proforma">
               <Plus className="h-4 w-4" aria-hidden="true" />
@@ -231,12 +250,12 @@ export function DashboardPage() {
           borderColor="#fc8181"
         />
         <StatCard
-          label="Proforma Pipeline"
-          value={formatCurrency(stats.proformaPipeline)}
+          label="Quotation Pipeline"
+          value={formatCurrency(stats.quotationPipeline)}
           subtitle={
-            stats.proformaCount === 0
-              ? "no active quotes"
-              : `${stats.proformaCount} active quotes`
+            stats.quotationCount === 0
+              ? "no active quotations"
+              : `${stats.quotationCount} active quotations`
           }
           icon={FileQuestion}
           accentColor="#7c3aed"
@@ -295,12 +314,13 @@ export function DashboardPage() {
           <Select
             className="md:w-48"
             value={typeFilter}
-            onChange={(event) => setTypeFilter(event.target.value as "all" | "tax-invoice" | "proforma")}
+            onChange={(event) => setTypeFilter(event.target.value as "all" | InvoiceType)}
             aria-label="Filter by type"
           >
             <option value="all">All types</option>
             <option value="tax-invoice">Tax Invoices</option>
             <option value="proforma">Proforma Invoices</option>
+            <option value="quotation">Quotations</option>
           </Select>
           <Select
             className="md:w-48"
@@ -355,11 +375,9 @@ export function DashboardPage() {
                       <div className="flex flex-col gap-1 items-start">
                         <span>{invoice.invoiceNumber}</span>
                         <span className={`text-[9px] px-1.5 py-0.5 rounded border leading-none font-semibold ${
-                          invoice.invoiceType === "proforma"
-                            ? "bg-[#faf5ff] text-[#6b21a8] border-[#e9d5ff]"
-                            : "bg-[#f8fafc] text-[#475569] border-[#e2e8f0]"
+                          invoiceTypeBadgeClass(invoice.invoiceType)
                         }`}>
-                          {invoice.invoiceType === "proforma" ? "Proforma" : "Tax Invoice"}
+                          {getInvoiceTypeLabel(invoice.invoiceType)}
                         </span>
                       </div>
                     </td>
@@ -375,7 +393,7 @@ export function DashboardPage() {
                     </td>
                     <td className="py-4">
                       <div className="flex justify-end gap-2">
-                        {invoice.invoiceType === "proforma" && (
+                        {isConvertibleToTaxInvoice(invoice.invoiceType) && (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -383,7 +401,7 @@ export function DashboardPage() {
                             aria-label="Convert to Tax Invoice"
                             onClick={async () => {
                               if (!repository) return;
-                              if (window.confirm(`Convert Proforma ${invoice.invoiceNumber} to a Tax Invoice?`)) {
+                              if (window.confirm(`Convert ${getInvoiceTypeLabel(invoice.invoiceType)} ${invoice.invoiceNumber} to a Tax Invoice?`)) {
                                 const allInvoices = await repository.list();
                                 const existing = allInvoices.map((record) => record.invoiceNumber);
                                 const nextType: InvoiceType = "tax-invoice";
@@ -460,12 +478,10 @@ export function DashboardPage() {
                     </span>
                     <span
                       className={`text-[9px] px-1.5 py-0.5 rounded border leading-none font-semibold ${
-                        invoice.invoiceType === "proforma"
-                          ? "bg-[#faf5ff] text-[#6b21a8] border-[#e9d5ff]"
-                          : "bg-[#f8fafc] text-[#475569] border-[#e2e8f0]"
+                        invoiceTypeBadgeClass(invoice.invoiceType)
                       }`}
                     >
-                      {invoice.invoiceType === "proforma" ? "Proforma" : "Tax Invoice"}
+                      {getInvoiceTypeLabel(invoice.invoiceType)}
                     </span>
                   </div>
                   <div className="text-right">
@@ -493,7 +509,7 @@ export function DashboardPage() {
                 </div>
 
                 <div className="flex justify-end gap-2 border-t border-hairline-soft pt-3">
-                  {invoice.invoiceType === "proforma" && (
+                  {isConvertibleToTaxInvoice(invoice.invoiceType) && (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -502,7 +518,7 @@ export function DashboardPage() {
                       className="h-9 px-3"
                       onClick={async () => {
                         if (!repository) return;
-                        if (window.confirm(`Convert Proforma ${invoice.invoiceNumber} to a Tax Invoice?`)) {
+                        if (window.confirm(`Convert ${getInvoiceTypeLabel(invoice.invoiceType)} ${invoice.invoiceNumber} to a Tax Invoice?`)) {
                           const allInvoices = await repository.list();
                           const existing = allInvoices.map((record) => record.invoiceNumber);
                           const nextType: InvoiceType = "tax-invoice";
