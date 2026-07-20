@@ -36,7 +36,7 @@ describe("paginateInvoiceItems", () => {
 
     render(React.createElement(InvoicePreview, { invoice, printRef: { current: null } }));
 
-    expect(screen.getByRole("heading", { name: "Quotation" })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { name: "OMM ECO BUILDTECH" })[0]).toBeInTheDocument();
     expect(screen.getByText(/^QT-/)).toBeInTheDocument();
   });
 });

@@ -1,66 +1,40 @@
-import { z } from "zod";
-
-import {
-  customerListSchema,
-  invoiceListSchema,
-} from "@/domain/invoices/schemas";
 import type {
   Customer,
   CustomerRepository,
+  Invoice,
   InvoiceFilters,
   InvoiceRepository,
 } from "@/domain/invoices/types";
+import { markDirty, clearSyncState } from "@/domain/sync/sync-state";
 
-import { LocalStorageCorruptionError } from "./errors";
-
-const STORAGE_KEYS = {
-  invoices: "invoice-gen:v1:invoices",
-  customers: "invoice-gen:v1:customers",
-};
-
-function sortByUpdatedAt<T extends { updatedAt: string }>(records: T[]): T[] {
-  return [...records].sort(
-    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-  );
-}
-
-function readCollection<T>(
-  storage: Storage,
-  key: string,
-  schema: z.ZodType<T[]>,
-): T[] {
-  const raw = storage.getItem(key);
-  if (!raw) return [];
-
-  try {
-    return schema.parse(JSON.parse(raw));
-  } catch (error) {
-    throw new LocalStorageCorruptionError(key, error);
-  }
-}
-
-function writeCollection<T>(storage: Storage, key: string, records: T[]): void {
-  storage.setItem(key, JSON.stringify(records));
-}
-
-function includesQuery(values: string[], query: string): boolean {
-  const normalizedQuery = query.trim().toLowerCase();
-  if (!normalizedQuery) return true;
-
-  return values.some((value) => value.toLowerCase().includes(normalizedQuery));
-}
+import {
+  STORAGE_KEYS,
+  emitDataChanged,
+  includesQuery,
+  isLive,
+  readCustomers,
+  readInvoices,
+  sortByUpdatedAt,
+  writeCustomers,
+  writeInvoices,
+} from "./collection-store";
 
 export function createLocalStorageCustomerRepository(
   storage: Storage,
 ): CustomerRepository {
-  const key = STORAGE_KEYS.customers;
+  function persist(records: Customer[], dirtyId: string): void {
+    writeCustomers(storage, records);
+    markDirty(storage, "customers", dirtyId);
+    emitDataChanged();
+  }
 
   return {
     async list() {
-      return sortByUpdatedAt(readCollection(storage, key, customerListSchema));
+      return sortByUpdatedAt(readCustomers(storage).filter(isLive));
     },
     async getById(id) {
-      return (await this.list()).find((customer) => customer.id === id) ?? null;
+      const record = readCustomers(storage).find((item) => item.id === id);
+      return record && isLive(record) ? record : null;
     },
     async create(customer) {
       const now = new Date().toISOString();
@@ -70,34 +44,40 @@ export function createLocalStorageCustomerRepository(
         createdAt: now,
         updatedAt: now,
       };
-      const records = readCollection(storage, key, customerListSchema);
-      writeCollection(storage, key, [record, ...records]);
+      persist([record, ...readCustomers(storage)], record.id);
       return record;
     },
     async update(id, customer) {
-      const records = readCollection(storage, key, customerListSchema);
+      const records = readCustomers(storage);
       const current = records.find((record) => record.id === id);
 
-      if (!current) throw new Error("Customer not found");
+      if (!current || !isLive(current)) throw new Error("Customer not found");
 
       const updated: Customer = {
         ...current,
         ...customer,
         updatedAt: new Date().toISOString(),
       };
-      writeCollection(
-        storage,
-        key,
+      persist(
         records.map((record) => (record.id === id ? updated : record)),
+        id,
       );
       return updated;
     },
     async delete(id) {
-      const records = readCollection(storage, key, customerListSchema);
-      writeCollection(
-        storage,
-        key,
-        records.filter((record) => record.id !== id),
+      const records = readCustomers(storage);
+      const current = records.find((record) => record.id === id);
+      if (!current) return;
+
+      // Soft-delete: keep a tombstone so the deletion syncs to other devices.
+      const tombstone: Customer = {
+        ...current,
+        deletedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      persist(
+        records.map((record) => (record.id === id ? tombstone : record)),
+        id,
       );
     },
     async search(query) {
@@ -116,7 +96,9 @@ export function createLocalStorageCustomerRepository(
       );
     },
     async reset() {
-      storage.removeItem(key);
+      storage.removeItem(STORAGE_KEYS.customers);
+      clearSyncState(storage);
+      emitDataChanged();
     },
   };
 }
@@ -124,38 +106,49 @@ export function createLocalStorageCustomerRepository(
 export function createLocalStorageInvoiceRepository(
   storage: Storage,
 ): InvoiceRepository {
-  const key = STORAGE_KEYS.invoices;
+  function persist(records: Invoice[], dirtyId: string): void {
+    writeInvoices(storage, records);
+    markDirty(storage, "invoices", dirtyId);
+    emitDataChanged();
+  }
 
   return {
     async list() {
-      return sortByUpdatedAt(readCollection(storage, key, invoiceListSchema));
+      return sortByUpdatedAt(readInvoices(storage).filter(isLive));
     },
     async getById(id) {
-      return (await this.list()).find((invoice) => invoice.id === id) ?? null;
+      const record = readInvoices(storage).find((item) => item.id === id);
+      return record && isLive(record) ? record : null;
     },
     async create(invoice) {
-      const records = readCollection(storage, key, invoiceListSchema);
-      writeCollection(storage, key, [invoice, ...records]);
+      persist([invoice, ...readInvoices(storage)], invoice.id);
       return invoice;
     },
     async update(id, invoice) {
-      const records = readCollection(storage, key, invoiceListSchema);
+      const records = readInvoices(storage);
       if (!records.some((record) => record.id === id)) {
         throw new Error("Invoice not found");
       }
-      writeCollection(
-        storage,
-        key,
+      persist(
         records.map((record) => (record.id === id ? invoice : record)),
+        id,
       );
       return invoice;
     },
     async delete(id) {
-      const records = readCollection(storage, key, invoiceListSchema);
-      writeCollection(
-        storage,
-        key,
-        records.filter((record) => record.id !== id),
+      const records = readInvoices(storage);
+      const current = records.find((record) => record.id === id);
+      if (!current) return;
+
+      const now = new Date().toISOString();
+      const tombstone: Invoice = {
+        ...current,
+        deletedAt: now,
+        updatedAt: now,
+      };
+      persist(
+        records.map((record) => (record.id === id ? tombstone : record)),
+        id,
       );
     },
     async search(filters: InvoiceFilters) {
@@ -179,7 +172,9 @@ export function createLocalStorageInvoiceRepository(
       });
     },
     async reset() {
-      storage.removeItem(key);
+      storage.removeItem(STORAGE_KEYS.invoices);
+      clearSyncState(storage);
+      emitDataChanged();
     },
   };
 }

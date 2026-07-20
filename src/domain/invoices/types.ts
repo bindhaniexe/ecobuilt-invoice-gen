@@ -30,6 +30,8 @@ export interface Customer extends CustomerDetails {
   id: string;
   createdAt: string;
   updatedAt: string;
+  /** ISO timestamp of a soft-delete tombstone; absent for live records. */
+  deletedAt?: string;
 }
 
 export interface InvoiceItemInput {
@@ -80,6 +82,8 @@ export interface Invoice {
   totals: InvoiceTotals;
   createdAt: string;
   updatedAt: string;
+  /** ISO timestamp of a soft-delete tombstone; absent for live records. */
+  deletedAt?: string;
   // Quotation specific fields
   dispatchSite?: string;
   quotationSubject?: string;

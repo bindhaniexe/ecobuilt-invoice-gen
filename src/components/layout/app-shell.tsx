@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Invoice } from "@/domain/invoices/types";
 import { getInvoiceTypeLabel } from "@/domain/invoices/document-type";
+import { SyncStatus } from "./sync-status";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -35,8 +36,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     setMounted(true);
   }, []);
 
-  // Don't render the app shell on the login page
-  if (pathname === "/login") {
+  // Don't render the app shell on the login page or print preview page
+  if (pathname === "/login" || pathname === "/print-preview") {
     return <>{children}</>;
   }
 
@@ -221,6 +222,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           </nav>
 
           <div className="flex items-center gap-2">
+            <SyncStatus className="hidden sm:inline-flex" />
+
             <Button asChild className="hidden md:inline-flex">
               <Link href="/invoices/new">
                 <FileText className="h-4 w-4" aria-hidden="true" />
@@ -311,15 +314,18 @@ export function AppShell({ children }: { children: ReactNode }) {
       >
         <div className="flex items-center justify-between">
           <span className="text-base font-bold text-ink">Menu</span>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Close navigation"
-            type="button"
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            <X className="h-5 w-5" aria-hidden="true" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <SyncStatus />
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Close navigation"
+              type="button"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <X className="h-5 w-5" aria-hidden="true" />
+            </Button>
+          </div>
         </div>
 
         <nav className="flex flex-col gap-2" aria-label="Mobile Primary">

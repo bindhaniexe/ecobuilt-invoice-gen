@@ -247,33 +247,8 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
     }
   }
 
-  async function withUnscaledPreview<T>(action: () => Promise<T>): Promise<T> {
-    if (!printRef.current) {
-      throw new Error("Invoice preview is not ready.");
-    }
-
-    // Temporarily remove live-preview scale so html2canvas captures full A4.
-    const scaleEl = printRef.current.closest(
-      ".invoice-preview-scale",
-    ) as HTMLElement | null;
-    if (scaleEl) {
-      scaleEl.style.setProperty("transform", "none");
-    }
-
-    try {
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-      });
-      return await action();
-    } finally {
-      if (scaleEl) {
-        scaleEl.style.removeProperty("transform");
-      }
-    }
-  }
-
   async function handleDownload() {
-    if (!printRef.current || !invoice) return;
+    if (!invoice) return;
 
     const saved = await handleSave({ quiet: true, skipNavigation: true });
     if (!saved) return;
@@ -283,9 +258,7 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
     setMessage("Invoice saved. Exporting PDF...");
 
     try {
-      await withUnscaledPreview(() =>
-        downloadInvoicePdf(printRef.current!, saved.invoiceNumber),
-      );
+      await downloadInvoicePdf(saved, saved.invoiceNumber);
       setMessage("Invoice saved and PDF downloaded.");
     } catch (error) {
       setFormError((error as Error).message || "PDF export failed.");
@@ -298,7 +271,7 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
   }
 
   async function handleWhatsAppShare() {
-    if (!printRef.current || !invoice) return;
+    if (!invoice) return;
 
     const saved = await handleSave({ quiet: true, skipNavigation: true });
     if (!saved) return;
@@ -308,9 +281,7 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
     setMessage("Invoice saved. Preparing WhatsApp share...");
 
     try {
-      const file = await withUnscaledPreview(() =>
-        createInvoicePdfFile(printRef.current!, saved.invoiceNumber),
-      );
+      const file = await createInvoicePdfFile(saved, saved.invoiceNumber);
 
       const customerName = saved.customerSnapshot.name || "Customer";
       const shareText = [

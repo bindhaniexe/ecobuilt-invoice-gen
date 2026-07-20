@@ -1,56 +1,53 @@
 "use client";
 
-async function renderInvoicePdf(printRoot: HTMLElement) {
-  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-    import("html2canvas"),
-    import("jspdf"),
-  ]);
-
-  await document.fonts.ready;
-
-  const pages = Array.from(
-    printRoot.querySelectorAll<HTMLElement>(".invoice-page"),
-  );
-  const targetPages = pages.length ? pages : [printRoot];
-  const pdf = new jsPDF({
-    orientation: "portrait",
-    unit: "mm",
-    format: "a4",
-    compress: true,
-  });
-
-  for (const [index, page] of targetPages.entries()) {
-    const canvas = await html2canvas(page, {
-      scale: 2.5,
-      useCORS: true,
-      backgroundColor: "#ffffff",
-      logging: false,
-      windowWidth: page.scrollWidth,
-      windowHeight: page.scrollHeight,
-    });
-
-    const image = canvas.toDataURL("image/png", 1);
-    if (index > 0) pdf.addPage("a4", "portrait");
-    pdf.addImage(image, "PNG", 0, 0, 210, 297, undefined, "FAST");
-  }
-
-  return pdf;
-}
+import type { Invoice } from "@/domain/invoices/types";
 
 export async function downloadInvoicePdf(
-  printRoot: HTMLElement,
+  invoice: Invoice,
   filename: string,
 ): Promise<void> {
-  const pdf = await renderInvoicePdf(printRoot);
-  pdf.save(`${filename}.pdf`);
+  const response = await fetch("/api/pdf", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(invoice),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: "Failed to download PDF" }));
+    throw new Error(err.error || "Failed to download PDF");
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${filename}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
 }
 
 export async function createInvoicePdfFile(
-  printRoot: HTMLElement,
+  invoice: Invoice,
   filename: string,
 ): Promise<File> {
-  const pdf = await renderInvoicePdf(printRoot);
-  const blob = pdf.output("blob");
+  const response = await fetch("/api/pdf", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(invoice),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: "Failed to generate PDF" }));
+    throw new Error(err.error || "Failed to generate PDF");
+  }
+
+  const blob = await response.blob();
   return new File([blob], `${filename}.pdf`, { type: "application/pdf" });
 }
 

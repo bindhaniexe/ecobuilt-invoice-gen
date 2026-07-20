@@ -8,6 +8,7 @@ import type {
   InvoiceFilters,
 } from "@/domain/invoices/types";
 import { LocalStorageCorruptionError } from "@/domain/storage/errors";
+import { DATA_CHANGED_EVENT } from "@/domain/storage/collection-store";
 import {
   createLocalStorageCustomerRepository,
   createLocalStorageInvoiceRepository,
@@ -53,6 +54,17 @@ export function useInvoices(filters: InvoiceFilters = {}) {
 
   useEffect(() => {
     void refresh();
+  }, [refresh]);
+
+  // Refresh when a local mutation or background sync changes stored data.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    function handleDataChanged() {
+      void refresh();
+    }
+    window.addEventListener(DATA_CHANGED_EVENT, handleDataChanged);
+    return () =>
+      window.removeEventListener(DATA_CHANGED_EVENT, handleDataChanged);
   }, [refresh]);
 
   return {
@@ -103,6 +115,17 @@ export function useCustomers(query = "") {
 
   useEffect(() => {
     void refresh();
+  }, [refresh]);
+
+  // Refresh when a local mutation or background sync changes stored data.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    function handleDataChanged() {
+      void refresh();
+    }
+    window.addEventListener(DATA_CHANGED_EVENT, handleDataChanged);
+    return () =>
+      window.removeEventListener(DATA_CHANGED_EVENT, handleDataChanged);
   }, [refresh]);
 
   return {

@@ -32,6 +32,7 @@ export const customerSchema = customerDetailsSchema.extend({
   id: z.string().min(1),
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
+  deletedAt: z.string().optional(),
 });
 
 export const invoiceItemSchema = z.object({
@@ -79,6 +80,7 @@ export const invoiceSchema = z.object({
   totals: invoiceTotalsSchema,
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
+  deletedAt: z.string().optional(),
   // Quotation specific fields
   dispatchSite: z.string().optional(),
   quotationSubject: z.string().optional(),

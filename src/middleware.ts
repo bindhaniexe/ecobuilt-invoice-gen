@@ -5,7 +5,7 @@ import type { NextRequest } from "next/server";
 const AUTH_COOKIE_NAME = "ecobuilt-session";
 
 /** Paths that don't require authentication. */
-const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/auth/logout"];
+const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/auth/logout", "/print-preview"];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some(

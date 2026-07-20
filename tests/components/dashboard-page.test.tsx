@@ -54,15 +54,15 @@ describe("DashboardPage", () => {
     });
   });
 
-  it("converts a quotation to a tax invoice in place", async () => {
+  it("converts a proforma to a tax invoice in place", async () => {
     const repo = createLocalStorageInvoiceRepository(window.localStorage);
     const saved = await repo.create(
       recalculateInvoice({
-        ...createInvoiceDraft([], "quotation"),
-        invoiceNumber: "QT-2026-27-0001",
+        ...createInvoiceDraft([], "proforma"),
+        invoiceNumber: "PI-2026-27-0001",
         issueDate: "2026-07-10",
         customerSnapshot: {
-          name: "Quote Client",
+          name: "Proforma Client",
           address: "123 Client St",
           gstNumber: "27ABCDE1234F1Z5",
           phone: "9999999999",
@@ -74,8 +74,8 @@ describe("DashboardPage", () => {
     render(<DashboardPage />);
 
     await waitFor(() => {
-      expect(screen.getAllByText("QT-2026-27-0001").length).toBeGreaterThanOrEqual(1);
-      expect(screen.getAllByText("Quotation").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("PI-2026-27-0001").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("Proforma").length).toBeGreaterThanOrEqual(1);
     });
 
     fireEvent.click(screen.getAllByRole("button", { name: /Convert to Tax Invoice/i })[0]);
@@ -87,7 +87,7 @@ describe("DashboardPage", () => {
     });
 
     expect(window.confirm).toHaveBeenCalledWith(
-      "Convert Quotation QT-2026-27-0001 to a Tax Invoice?",
+      "Convert Proforma PI-2026-27-0001 to a Tax Invoice?",
     );
   });
 });
