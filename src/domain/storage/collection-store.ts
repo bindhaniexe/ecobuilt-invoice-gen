@@ -20,12 +20,28 @@ export const STORAGE_KEYS = {
   customers: "invoice-gen:v1:customers",
 } as const;
 
-/** Emitted after any local mutation or sync merge so UI hooks can refresh. */
+/** Emitted after any local write or sync merge so UI hooks can refresh. */
 export const DATA_CHANGED_EVENT = "invoice-gen:data-changed";
+
+/**
+ * Emitted only for user-initiated local writes (save/delete), carrying the
+ * changed record so the sync layer can push it. Sync merges do NOT emit this,
+ * which is what prevents a pull → push → pull loop.
+ */
+export const LOCAL_MUTATION_EVENT = "invoice-gen:local-mutation";
+
+export type LocalMutation =
+  | { collection: "customers"; record: import("@/domain/invoices/types").Customer }
+  | { collection: "invoices"; record: import("@/domain/invoices/types").Invoice };
 
 export function emitDataChanged(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(DATA_CHANGED_EVENT));
+}
+
+export function emitLocalMutation(detail: LocalMutation): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(LOCAL_MUTATION_EVENT, { detail }));
 }
 
 export function sortByUpdatedAt<T extends { updatedAt: string }>(

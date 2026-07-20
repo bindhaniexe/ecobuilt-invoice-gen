@@ -7,25 +7,14 @@ import {
 } from "@/domain/storage/collection-store";
 import type { Customer, Invoice } from "@/domain/invoices/types";
 
-import {
-  syncResponseSchema,
-  type SyncRequest,
-  type SyncResponse,
-} from "./types";
-import {
-  clearDirty,
-  getCursor,
-  getDirtyIds,
-  setCursor,
-} from "./sync-state";
+import { syncPullSchema, type SyncPush } from "./types";
 
 const SYNC_ENDPOINT = "/api/sync";
+const SEED_FLAG_KEY = "invoice-gen:v1:sync:seeded";
 
-export type SyncOutcome =
-  | { status: "ok"; pulled: number; pushed: number }
-  | { status: "offline" }
+export type SyncResult =
+  | { status: "ok" }
   | { status: "disabled" }
-  | { status: "unauthorized" }
   | { status: "error"; message: string };
 
 /** Records with a matching id, keeping whichever has the newer updatedAt. */
@@ -51,99 +40,81 @@ function mergeById<T extends { id: string; updatedAt: string }>(
   return { merged: [...byId.values()], changed };
 }
 
-function collectDirty<T extends { id: string }>(
-  records: T[],
-  dirtyIds: Set<string>,
-): T[] {
-  return records.filter((record) => dirtyIds.has(record.id));
-}
-
-/**
- * Run one full sync cycle against the server: push locally-dirty records
- * (including tombstones) and merge back everything changed elsewhere.
- *
- * Offline-safe: a network failure leaves local data and the dirty sets intact
- * so the changes retry on the next cycle. Returns a coarse outcome for the UI.
- */
-export async function runSync(storage: Storage): Promise<SyncOutcome> {
-  if (typeof navigator !== "undefined" && navigator.onLine === false) {
-    return { status: "offline" };
+/** Pull the full dataset and merge it into local storage (last-write-wins). */
+export async function pullAll(storage: Storage): Promise<SyncResult> {
+  let response: Response;
+  try {
+    response = await fetch(SYNC_ENDPOINT, { method: "GET" });
+  } catch (error) {
+    return { status: "error", message: (error as Error).message };
   }
 
-  const dirtyCustomerIds = getDirtyIds(storage, "customers");
-  const dirtyInvoiceIds = getDirtyIds(storage, "invoices");
+  if (response.status === 503) return { status: "disabled" };
+  if (!response.ok) {
+    return { status: "error", message: `Pull failed (${response.status})` };
+  }
 
-  const localCustomers = readCustomers(storage);
-  const localInvoices = readInvoices(storage);
+  let pull;
+  try {
+    pull = syncPullSchema.parse(await response.json());
+  } catch (error) {
+    return { status: "error", message: (error as Error).message };
+  }
 
-  const payload: SyncRequest = {
-    cursor: getCursor(storage),
-    customers: collectDirty(localCustomers, dirtyCustomerIds),
-    invoices: collectDirty(localInvoices, dirtyInvoiceIds),
-  };
+  const customerMerge = mergeById<Customer>(readCustomers(storage), pull.customers);
+  const invoiceMerge = mergeById<Invoice>(readInvoices(storage), pull.invoices);
+
+  if (customerMerge.changed) writeCustomers(storage, customerMerge.merged);
+  if (invoiceMerge.changed) writeInvoices(storage, invoiceMerge.merged);
+
+  // Note: merges deliberately do NOT emit a local-mutation, so a pull never
+  // triggers a push. They emit data-changed so the UI refreshes.
+  if (customerMerge.changed || invoiceMerge.changed) emitDataChanged();
+
+  return { status: "ok" };
+}
+
+/** Push the given records to the server (upserted with last-write-wins). */
+export async function pushRecords(push: SyncPush): Promise<SyncResult> {
+  if (!push.customers.length && !push.invoices.length) return { status: "ok" };
 
   let response: Response;
   try {
     response = await fetch(SYNC_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(push),
     });
-  } catch {
-    return { status: "offline" };
-  }
-
-  if (response.status === 503) {
-    // Server has no DATABASE_URL configured — sync is disabled.
-    return { status: "disabled" };
-  }
-
-  if (response.status === 401) {
-    // Session missing/expired or signed with an old AUTH_SECRET. The user needs
-    // to sign in again to get a valid cookie.
-    return { status: "unauthorized" };
-  }
-
-  if (!response.ok) {
-    return {
-      status: "error",
-      message: `Sync failed with status ${response.status}`,
-    };
-  }
-
-  let parsed: SyncResponse;
-  try {
-    parsed = syncResponseSchema.parse(await response.json());
   } catch (error) {
     return { status: "error", message: (error as Error).message };
   }
 
-  // Merge pulled records (LWW) into the freshest local snapshot. Re-read in
-  // case the user mutated data during the request.
-  const customerMerge = mergeById<Customer>(
-    readCustomers(storage),
-    parsed.customers,
-  );
-  const invoiceMerge = mergeById<Invoice>(
-    readInvoices(storage),
-    parsed.invoices,
-  );
+  if (response.status === 503) return { status: "disabled" };
+  if (!response.ok) {
+    return { status: "error", message: `Push failed (${response.status})` };
+  }
 
-  if (customerMerge.changed) writeCustomers(storage, customerMerge.merged);
-  if (invoiceMerge.changed) writeInvoices(storage, invoiceMerge.merged);
+  return { status: "ok" };
+}
 
-  // The pushed records are now on the server: clear them from the dirty sets.
-  // Ids re-dirtied mid-request are preserved for the next cycle.
-  clearDirty(storage, "customers", dirtyCustomerIds);
-  clearDirty(storage, "invoices", dirtyInvoiceIds);
+/**
+ * One-time migration: push every record already in local storage (from before
+ * sync existed) up to the server. Runs once per browser, tracked by a flag.
+ */
+export async function seedOnce(storage: Storage): Promise<SyncResult> {
+  if (storage.getItem(SEED_FLAG_KEY)) return { status: "ok" };
 
-  setCursor(storage, parsed.cursor);
+  const result = await pushRecords({
+    customers: readCustomers(storage),
+    invoices: readInvoices(storage),
+  });
 
-  if (customerMerge.changed || invoiceMerge.changed) emitDataChanged();
+  // Only mark seeded when the server actually accepted the data. If sync is
+  // disabled we leave the flag unset so seeding retries once it's configured.
+  if (result.status === "ok") storage.setItem(SEED_FLAG_KEY, "1");
+  return result;
+}
 
-  return {
-    status: "ok",
-    pulled: parsed.customers.length + parsed.invoices.length,
-    pushed: payload.customers.length + payload.invoices.length,
-  };
+export function clearSeedFlag(storage: Storage): void {
+  storage.removeItem(SEED_FLAG_KEY);
 }

@@ -2,105 +2,76 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { runSync, type SyncOutcome } from "@/domain/sync/sync-engine";
+import {
+  LOCAL_MUTATION_EVENT,
+  type LocalMutation,
+} from "@/domain/storage/collection-store";
+import { pullAll, pushRecords, seedOnce } from "@/domain/sync/sync-engine";
 
-export type SyncStatus =
-  | "idle"
-  | "syncing"
-  | "synced"
-  | "offline"
-  | "disabled"
-  | "unauthorized"
-  | "error";
-
-const AUTO_SYNC_INTERVAL_MS = 60_000;
-// Debounce post-mutation syncs so a burst of edits triggers a single push.
-const MUTATION_DEBOUNCE_MS = 2_000;
+export type SyncStatus = "idle" | "syncing" | "synced" | "disabled" | "error";
 
 /**
- * Drives background sync: on mount, when the tab comes online, on an interval,
- * and (debounced) after local mutations. Never throws — a failed cycle just
- * updates the status and retries next tick, so the app stays usable offline.
+ * Simple push-on-save / pull-on-load sync:
+ *   - On mount: seed any pre-existing local data up once, then pull the server
+ *     dataset down and merge it.
+ *   - On each local mutation (save/delete): push just that record.
+ *
+ * No intervals, no offline bookkeeping — the app is always online behind login.
  */
 export function useSync() {
   const [status, setStatus] = useState<SyncStatus>("idle");
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
-  const inFlight = useRef(false);
-  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const busy = useRef(false);
 
-  const sync = useCallback(async () => {
-    if (inFlight.current) return;
-    if (typeof window === "undefined") return;
-
-    inFlight.current = true;
-    setStatus((prev) => (prev === "disabled" ? prev : "syncing"));
-
-    let outcome: SyncOutcome;
-    try {
-      outcome = await runSync(window.localStorage);
-    } catch (error) {
-      outcome = { status: "error", message: (error as Error).message };
-    } finally {
-      inFlight.current = false;
-    }
-
-    switch (outcome.status) {
-      case "ok":
-        setStatus("synced");
-        setLastSyncedAt(new Date());
-        break;
-      case "offline":
-        setStatus("offline");
-        break;
-      case "disabled":
-        setStatus("disabled");
-        break;
-      case "unauthorized":
-        setStatus("unauthorized");
-        break;
-      case "error":
-        setStatus("error");
-        break;
+  const apply = useCallback((result: { status: SyncStatus | "ok" }) => {
+    if (result.status === "ok") {
+      setStatus("synced");
+      setLastSyncedAt(new Date());
+    } else {
+      setStatus(result.status as SyncStatus);
     }
   }, []);
 
-  // Sync on mount.
-  useEffect(() => {
-    void sync();
-  }, [sync]);
-
-  // Sync when the connection is restored; mark offline when it drops.
-  useEffect(() => {
-    function handleOnline() {
-      void sync();
+  // Seed + pull on mount.
+  const refresh = useCallback(async () => {
+    if (typeof window === "undefined" || busy.current) return;
+    busy.current = true;
+    setStatus((prev) => (prev === "disabled" ? prev : "syncing"));
+    try {
+      const seed = await seedOnce(window.localStorage);
+      if (seed.status === "disabled") {
+        setStatus("disabled");
+        return;
+      }
+      apply(await pullAll(window.localStorage));
+    } finally {
+      busy.current = false;
     }
-    function handleOffline() {
-      setStatus((prev) => (prev === "disabled" ? prev : "offline"));
+  }, [apply]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  // Push each locally-saved/deleted record.
+  useEffect(() => {
+    function handleMutation(event: Event) {
+      const detail = (event as CustomEvent<LocalMutation>).detail;
+      if (!detail) return;
+
+      const push =
+        detail.collection === "customers"
+          ? { customers: [detail.record], invoices: [] }
+          : { customers: [], invoices: [detail.record] };
+
+      setStatus((prev) => (prev === "disabled" ? prev : "syncing"));
+      void pushRecords(push).then(apply);
     }
 
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-    };
-  }, [sync]);
+    window.addEventListener(LOCAL_MUTATION_EVENT, handleMutation);
+    return () =>
+      window.removeEventListener(LOCAL_MUTATION_EVENT, handleMutation);
+  }, [apply]);
 
-  // Periodic background sync to pull changes from other devices.
-  useEffect(() => {
-    const interval = setInterval(() => {
-      void sync();
-    }, AUTO_SYNC_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [sync]);
-
-  // Debounced sync after local mutations, signalled via the data-changed event.
-  const requestSync = useCallback(() => {
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(() => {
-      void sync();
-    }, MUTATION_DEBOUNCE_MS);
-  }, [sync]);
-
-  return { status, lastSyncedAt, sync, requestSync };
+  return { status, lastSyncedAt, sync: refresh };
 }

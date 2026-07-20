@@ -1,10 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { Check, CloudOff, LogIn, RefreshCw, TriangleAlert } from "lucide-react";
+import { Check, CloudOff, RefreshCw, TriangleAlert } from "lucide-react";
 
-import { DATA_CHANGED_EVENT } from "@/domain/storage/collection-store";
 import { useSync, type SyncStatus as Status } from "@/hooks/use-sync";
 import { cn } from "@/lib/utils";
 
@@ -15,55 +12,30 @@ const PRESENTATION: Record<
   idle: { label: "Sync", icon: RefreshCw, className: "text-muted" },
   syncing: { label: "Syncing", icon: RefreshCw, className: "text-muted", spin: true },
   synced: { label: "Synced", icon: Check, className: "text-[#245536]" },
-  offline: { label: "Offline", icon: CloudOff, className: "text-muted" },
   disabled: { label: "Local only", icon: CloudOff, className: "text-muted" },
-  unauthorized: { label: "Sign in to sync", icon: LogIn, className: "text-[#c13515]" },
-  error: { label: "Sync error", icon: TriangleAlert, className: "text-[#c13515]" },
+  error: { label: "Retry sync", icon: TriangleAlert, className: "text-[#c13515]" },
 };
 
 /**
- * Renders the current sync state and, invisibly, drives background sync: it
- * mounts useSync and re-triggers a debounced sync whenever local data changes.
- * "Local only" means the server has no DATABASE_URL — the app works fully
- * offline and this is expected, not an error.
+ * Shows the current sync state and drives it: mounting useSync seeds+pulls on
+ * load and pushes on every local save/delete. "Local only" means the server
+ * has no DATABASE_URL configured.
  */
 export function SyncStatus({ className }: { className?: string }) {
-  const router = useRouter();
-  const { status, sync, requestSync } = useSync();
-
-  useEffect(() => {
-    function handleDataChanged() {
-      requestSync();
-    }
-    window.addEventListener(DATA_CHANGED_EVENT, handleDataChanged);
-    return () =>
-      window.removeEventListener(DATA_CHANGED_EVENT, handleDataChanged);
-  }, [requestSync]);
+  const { status, sync } = useSync();
 
   const { label, icon: Icon, className: tone, spin } = PRESENTATION[status];
   const interactive = status !== "disabled" && status !== "syncing";
 
-  function handleClick() {
-    if (!interactive) return;
-    // An invalid/expired session can only be fixed by signing in again.
-    if (status === "unauthorized") {
-      router.push("/login");
-      return;
-    }
-    void sync();
-  }
-
   return (
     <button
       type="button"
-      onClick={handleClick}
+      onClick={() => interactive && void sync()}
       disabled={!interactive}
       title={
         status === "disabled"
           ? "Data is stored locally. Configure DATABASE_URL to sync."
-          : status === "unauthorized"
-            ? "Your session expired. Click to sign in again."
-            : "Sync now"
+          : "Sync now"
       }
       aria-label={`Sync status: ${label}`}
       className={cn(

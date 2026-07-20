@@ -5,11 +5,11 @@ import type {
   InvoiceFilters,
   InvoiceRepository,
 } from "@/domain/invoices/types";
-import { markDirty, clearSyncState } from "@/domain/sync/sync-state";
 
 import {
   STORAGE_KEYS,
   emitDataChanged,
+  emitLocalMutation,
   includesQuery,
   isLive,
   readCustomers,
@@ -18,14 +18,15 @@ import {
   writeCustomers,
   writeInvoices,
 } from "./collection-store";
+import { clearSeedFlag } from "@/domain/sync/sync-engine";
 
 export function createLocalStorageCustomerRepository(
   storage: Storage,
 ): CustomerRepository {
-  function persist(records: Customer[], dirtyId: string): void {
+  function persist(records: Customer[], mutated: Customer): void {
     writeCustomers(storage, records);
-    markDirty(storage, "customers", dirtyId);
     emitDataChanged();
+    emitLocalMutation({ collection: "customers", record: mutated });
   }
 
   return {
@@ -44,7 +45,7 @@ export function createLocalStorageCustomerRepository(
         createdAt: now,
         updatedAt: now,
       };
-      persist([record, ...readCustomers(storage)], record.id);
+      persist([record, ...readCustomers(storage)], record);
       return record;
     },
     async update(id, customer) {
@@ -60,7 +61,7 @@ export function createLocalStorageCustomerRepository(
       };
       persist(
         records.map((record) => (record.id === id ? updated : record)),
-        id,
+        updated,
       );
       return updated;
     },
@@ -70,14 +71,15 @@ export function createLocalStorageCustomerRepository(
       if (!current) return;
 
       // Soft-delete: keep a tombstone so the deletion syncs to other devices.
+      const now = new Date().toISOString();
       const tombstone: Customer = {
         ...current,
-        deletedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        deletedAt: now,
+        updatedAt: now,
       };
       persist(
         records.map((record) => (record.id === id ? tombstone : record)),
-        id,
+        tombstone,
       );
     },
     async search(query) {
@@ -97,7 +99,7 @@ export function createLocalStorageCustomerRepository(
     },
     async reset() {
       storage.removeItem(STORAGE_KEYS.customers);
-      clearSyncState(storage);
+      clearSeedFlag(storage);
       emitDataChanged();
     },
   };
@@ -106,10 +108,10 @@ export function createLocalStorageCustomerRepository(
 export function createLocalStorageInvoiceRepository(
   storage: Storage,
 ): InvoiceRepository {
-  function persist(records: Invoice[], dirtyId: string): void {
+  function persist(records: Invoice[], mutated: Invoice): void {
     writeInvoices(storage, records);
-    markDirty(storage, "invoices", dirtyId);
     emitDataChanged();
+    emitLocalMutation({ collection: "invoices", record: mutated });
   }
 
   return {
@@ -121,7 +123,7 @@ export function createLocalStorageInvoiceRepository(
       return record && isLive(record) ? record : null;
     },
     async create(invoice) {
-      persist([invoice, ...readInvoices(storage)], invoice.id);
+      persist([invoice, ...readInvoices(storage)], invoice);
       return invoice;
     },
     async update(id, invoice) {
@@ -131,7 +133,7 @@ export function createLocalStorageInvoiceRepository(
       }
       persist(
         records.map((record) => (record.id === id ? invoice : record)),
-        id,
+        invoice,
       );
       return invoice;
     },
@@ -148,7 +150,7 @@ export function createLocalStorageInvoiceRepository(
       };
       persist(
         records.map((record) => (record.id === id ? tombstone : record)),
-        id,
+        tombstone,
       );
     },
     async search(filters: InvoiceFilters) {
@@ -173,7 +175,7 @@ export function createLocalStorageInvoiceRepository(
     },
     async reset() {
       storage.removeItem(STORAGE_KEYS.invoices);
-      clearSyncState(storage);
+      clearSeedFlag(storage);
       emitDataChanged();
     },
   };

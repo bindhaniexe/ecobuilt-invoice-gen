@@ -3,31 +3,25 @@ import { z } from "zod";
 import { customerSchema, invoiceSchema } from "@/domain/invoices/schemas";
 
 /**
- * The wire contract between the client sync engine and POST /api/sync.
+ * Wire contract for /api/sync.
  *
- * A single round-trip both pushes local changes and pulls remote ones:
- *   1. The client sends every locally-dirty record (including tombstones) plus
- *      its `cursor` — the server-clock watermark from its previous sync.
- *   2. The server applies last-write-wins upserts, then returns every record
- *      changed since `cursor` and a fresh `cursor` for next time.
+ * - POST pushes changed records (upserted server-side with last-write-wins).
+ * - GET returns the full dataset (including tombstones) for the client to
+ *   merge on load.
+ *
+ * No cursor or dirty tracking: the app is always online behind a login, so
+ * "push on save, pull on load" keeps devices in sync without offline bookkeeping.
  */
 
-export const syncRequestSchema = z.object({
-  /**
-   * Server-clock ISO timestamp from the client's previous sync. Null/undefined
-   * on first sync, which pulls the entire dataset.
-   */
-  cursor: z.string().datetime().nullish(),
+export const syncPushSchema = z.object({
   customers: z.array(customerSchema).default([]),
   invoices: z.array(invoiceSchema).default([]),
 });
 
-export const syncResponseSchema = z.object({
-  /** New server-clock watermark to send back on the next sync. */
-  cursor: z.string().datetime(),
+export const syncPullSchema = z.object({
   customers: z.array(customerSchema).default([]),
   invoices: z.array(invoiceSchema).default([]),
 });
 
-export type SyncRequest = z.infer<typeof syncRequestSchema>;
-export type SyncResponse = z.infer<typeof syncResponseSchema>;
+export type SyncPush = z.infer<typeof syncPushSchema>;
+export type SyncPull = z.infer<typeof syncPullSchema>;
