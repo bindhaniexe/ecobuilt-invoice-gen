@@ -1,5 +1,34 @@
 import { NextResponse } from "next/server";
 import puppeteer from "puppeteer";
+import fs from "fs";
+
+function getChromeExecutablePath(): string | undefined {
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    return process.env.PUPPETEER_EXECUTABLE_PATH;
+  }
+  if (process.env.CHROME_PATH) {
+    return process.env.CHROME_PATH;
+  }
+
+  const candidatePaths = [
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/chrome",
+    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files\\Chromium\\Application\\chrome.exe",
+  ];
+
+  for (const candidate of candidatePaths) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return undefined;
+}
 
 export async function POST(request: Request) {
   try {
@@ -11,11 +40,24 @@ export async function POST(request: Request) {
     const baseUrl = `${protocol}://${host}`;
     const targetUrl = `${baseUrl}/print-preview`;
 
-    // Launch puppeteer
-    const browser = await puppeteer.launch({
+    const executablePath = getChromeExecutablePath();
+    const launchOptions: Parameters<typeof puppeteer.launch>[0] = {
       headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--single-process",
+        "--no-zygote",
+      ],
+    };
+
+    if (executablePath) {
+      launchOptions.executablePath = executablePath;
+    }
+
+    // Launch puppeteer
+    const browser = await puppeteer.launch(launchOptions);
 
     const page = await browser.newPage();
 
@@ -23,10 +65,12 @@ export async function POST(request: Request) {
     await page.setViewport({ width: 1200, height: 1600, deviceScaleFactor: 2 });
 
     // Navigate to print-preview
-    await page.goto(targetUrl, { waitUntil: "networkidle0" });
+    await page.goto(targetUrl, { waitUntil: "networkidle0", timeout: 15000 });
 
     // Wait for the page to be ready
-    await page.waitForFunction(() => window.isPrintPreviewReady === true);
+    await page.waitForFunction(() => window.isPrintPreviewReady === true, {
+      timeout: 10000,
+    });
 
     // Inject data and render
     await page.evaluate((data) => {
@@ -34,7 +78,7 @@ export async function POST(request: Request) {
     }, invoiceData);
 
     // Wait for the .print-area selector to be rendered
-    await page.waitForSelector(".print-area");
+    await page.waitForSelector(".print-area", { timeout: 10000 });
 
     // Give it a tiny bit of time to make sure any webfonts are fully drawn
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -63,8 +107,11 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("PDF generation error:", error);
     return NextResponse.json(
-      { error: `Failed to generate PDF: ${(error as Error).message}` },
-      { status: 500 }
+      {
+        error: `Failed to generate PDF: ${(error as Error).message}`,
+        code: "SERVER_PUPPETEER_UNAVAILABLE",
+      },
+      { status: 503 }
     );
   }
 }

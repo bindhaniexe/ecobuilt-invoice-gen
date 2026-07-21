@@ -258,7 +258,7 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
     setMessage("Invoice saved. Exporting PDF...");
 
     try {
-      await downloadInvoicePdf(saved, saved.invoiceNumber);
+      await downloadInvoicePdf(saved, saved.invoiceNumber, printRef.current);
       setMessage("Invoice saved and PDF downloaded.");
     } catch (error) {
       setFormError((error as Error).message || "PDF export failed.");
@@ -281,7 +281,7 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
     setMessage("Invoice saved. Preparing WhatsApp share...");
 
     try {
-      const file = await createInvoicePdfFile(saved, saved.invoiceNumber);
+      const file = await createInvoicePdfFile(saved, saved.invoiceNumber, printRef.current);
 
       const customerName = saved.customerSnapshot.name || "Customer";
       const shareText = [
