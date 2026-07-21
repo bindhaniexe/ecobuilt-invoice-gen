@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer-core";
+import chromium from "@sparticuz/chromium";
 import fs from "fs";
 
-function getChromeExecutablePath(): string | undefined {
+function getLocalChromePath(): string | undefined {
   if (process.env.PUPPETEER_EXECUTABLE_PATH) {
     return process.env.PUPPETEER_EXECUTABLE_PATH;
   }
@@ -31,6 +32,7 @@ function getChromeExecutablePath(): string | undefined {
 }
 
 export async function POST(request: Request) {
+  let browser;
   try {
     const invoiceData = await request.json();
 
@@ -40,24 +42,30 @@ export async function POST(request: Request) {
     const baseUrl = `${protocol}://${host}`;
     const targetUrl = `${baseUrl}/print-preview`;
 
-    const executablePath = getChromeExecutablePath();
-    const launchOptions: Parameters<typeof puppeteer.launch>[0] = {
-      headless: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--single-process",
-        "--no-zygote",
-      ],
-    };
+    const isLocalDev = process.env.NODE_ENV === "development";
+    const localExecutablePath = getLocalChromePath();
 
-    if (executablePath) {
-      launchOptions.executablePath = executablePath;
+    if (isLocalDev && localExecutablePath) {
+      // In local development with a local Chrome installation:
+      browser = await puppeteer.launch({
+        headless: true,
+        executablePath: localExecutablePath,
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+        ],
+      });
+    } else {
+      // Production / Serverless environment (Vercel, AWS, etc.):
+      const executablePath = await chromium.executablePath();
+      browser = await puppeteer.launch({
+        args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"],
+        defaultViewport: { width: 1200, height: 1600, deviceScaleFactor: 2 },
+        executablePath,
+        headless: true,
+      });
     }
-
-    // Launch puppeteer
-    const browser = await puppeteer.launch(launchOptions);
 
     const page = await browser.newPage();
 
@@ -65,7 +73,7 @@ export async function POST(request: Request) {
     await page.setViewport({ width: 1200, height: 1600, deviceScaleFactor: 2 });
 
     // Navigate to print-preview
-    await page.goto(targetUrl, { waitUntil: "networkidle0", timeout: 15000 });
+    await page.goto(targetUrl, { waitUntil: "networkidle0", timeout: 20000 });
 
     // Wait for the page to be ready
     await page.waitForFunction(() => window.isPrintPreviewReady === true, {
@@ -106,6 +114,9 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("PDF generation error:", error);
+    if (browser) {
+      await browser.close().catch(() => {});
+    }
     return NextResponse.json(
       {
         error: `Failed to generate PDF: ${(error as Error).message}`,
