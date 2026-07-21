@@ -8,48 +8,33 @@ import type { Invoice } from "@/domain/invoices/types";
 import { InvoicePreview } from "@/components/invoices/invoice-template";
 
 export async function generateClientSidePdfBlob(
-  invoice: Invoice,
-  element?: HTMLElement | null
+  invoice: Invoice
 ): Promise<Blob> {
-  let targetElement: HTMLElement | null = element || null;
-  let tempContainer: HTMLDivElement | null = null;
-  let rootToUnmount: ReturnType<typeof createRoot> | null = null;
+  const tempContainer = document.createElement("div");
+  tempContainer.style.position = "absolute";
+  tempContainer.style.left = "-9999px";
+  tempContainer.style.top = "-9999px";
+  tempContainer.style.width = "210mm";
+  tempContainer.style.backgroundColor = "#ffffff";
+  tempContainer.style.transform = "none";
+  document.body.appendChild(tempContainer);
 
-  if (!targetElement) {
-    targetElement =
-      document.querySelector(".print-area") ||
-      document.querySelector(".invoice-page");
-  }
-
-  if (!targetElement) {
-    // Create temporary off-screen container for client-side rendering
-    tempContainer = document.createElement("div");
-    tempContainer.style.position = "absolute";
-    tempContainer.style.left = "-9999px";
-    tempContainer.style.top = "-9999px";
-    tempContainer.style.width = "210mm";
-    tempContainer.style.backgroundColor = "#ffffff";
-    document.body.appendChild(tempContainer);
-
-    const printRef = React.createRef<HTMLDivElement>();
-    rootToUnmount = createRoot(tempContainer);
-
-    await new Promise<void>((resolve) => {
-      rootToUnmount!.render(
-        React.createElement(InvoicePreview, { invoice, printRef })
-      );
-      setTimeout(resolve, 300);
-    });
-
-    targetElement = tempContainer;
-  }
+  const printRef = React.createRef<HTMLDivElement>();
+  const rootToUnmount = createRoot(tempContainer);
 
   try {
+    await new Promise<void>((resolve) => {
+      rootToUnmount.render(
+        React.createElement(InvoicePreview, { invoice, printRef })
+      );
+      setTimeout(resolve, 400);
+    });
+
     const pageElements = Array.from(
-      targetElement.querySelectorAll<HTMLElement>(".invoice-page")
+      tempContainer.querySelectorAll<HTMLElement>(".invoice-page")
     );
     const targetsToCapture =
-      pageElements.length > 0 ? pageElements : [targetElement];
+      pageElements.length > 0 ? pageElements : [tempContainer];
 
     const pdf = new jsPDF({
       orientation: "portrait",
@@ -79,25 +64,23 @@ export async function generateClientSidePdfBlob(
 
     return pdf.output("blob");
   } finally {
-    if (rootToUnmount && tempContainer) {
-      setTimeout(() => {
-        try {
-          rootToUnmount?.unmount();
-          if (tempContainer?.parentNode) {
-            tempContainer.parentNode.removeChild(tempContainer);
-          }
-        } catch {
-          // Ignore unmount cleanup errors
+    setTimeout(() => {
+      try {
+        rootToUnmount.unmount();
+        if (tempContainer.parentNode) {
+          tempContainer.parentNode.removeChild(tempContainer);
         }
-      }, 100);
-    }
+      } catch {
+        // Ignore unmount cleanup errors
+      }
+    }, 100);
   }
 }
 
 export async function downloadInvoicePdf(
   invoice: Invoice,
   filename: string,
-  element?: HTMLElement | null
+  _element?: HTMLElement | null
 ): Promise<void> {
   let blob: Blob;
 
@@ -113,13 +96,13 @@ export async function downloadInvoicePdf(
     if (!response.ok) {
       const err = await response.json().catch(() => ({ error: "Server PDF route error" }));
       console.warn("Server PDF generation unavailable:", err.error, "Falling back to client PDF.");
-      blob = await generateClientSidePdfBlob(invoice, element);
+      blob = await generateClientSidePdfBlob(invoice);
     } else {
       blob = await response.blob();
     }
   } catch (error) {
     console.warn("Server PDF fetch failed:", error, "Falling back to client PDF.");
-    blob = await generateClientSidePdfBlob(invoice, element);
+    blob = await generateClientSidePdfBlob(invoice);
   }
 
   const url = window.URL.createObjectURL(blob);
@@ -135,7 +118,7 @@ export async function downloadInvoicePdf(
 export async function createInvoicePdfFile(
   invoice: Invoice,
   filename: string,
-  element?: HTMLElement | null
+  _element?: HTMLElement | null
 ): Promise<File> {
   let blob: Blob;
 
@@ -151,13 +134,13 @@ export async function createInvoicePdfFile(
     if (!response.ok) {
       const err = await response.json().catch(() => ({ error: "Server PDF route error" }));
       console.warn("Server PDF generation unavailable:", err.error, "Falling back to client PDF.");
-      blob = await generateClientSidePdfBlob(invoice, element);
+      blob = await generateClientSidePdfBlob(invoice);
     } else {
       blob = await response.blob();
     }
   } catch (error) {
     console.warn("Server PDF fetch failed:", error, "Falling back to client PDF.");
-    blob = await generateClientSidePdfBlob(invoice, element);
+    blob = await generateClientSidePdfBlob(invoice);
   }
 
   return new File([blob], `${filename}.pdf`, { type: "application/pdf" });

@@ -38,7 +38,8 @@ export async function POST(request: Request) {
 
     // Determine the base URL from request headers
     const host = request.headers.get("host") || "localhost:3000";
-    const protocol = request.headers.get("x-forwarded-proto") || "http";
+    const forwardedProto = request.headers.get("x-forwarded-proto");
+    const protocol = forwardedProto || (host.includes("localhost") ? "http" : "https");
     const baseUrl = `${protocol}://${host}`;
     const targetUrl = `${baseUrl}/print-preview`;
 
