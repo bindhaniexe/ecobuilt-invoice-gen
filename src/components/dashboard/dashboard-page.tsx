@@ -154,6 +154,12 @@ export function DashboardPage() {
       0,
     );
 
+    // Total Quotations
+    const totalQuotations = quotationInvoices.reduce(
+      (sum, inv) => sum + inv.totals.grandTotal,
+      0,
+    );
+
     return {
       totalInvoiced,
       received,
@@ -162,6 +168,7 @@ export function DashboardPage() {
       overdueCount: overdueInvoices.length,
       totalProforma,
       proformaCount: proformaInvoices.length,
+      totalQuotations,
       quotationCount: quotationInvoices.length,
     };
   }, [invoices]);
@@ -238,16 +245,16 @@ export function DashboardPage() {
           borderColor="#fbbf24"
         />
         <StatCard
-          label="Overdue"
-          value={formatCurrency(stats.overdue)}
+          label="Total Quotations"
+          value={formatCurrency(stats.totalQuotations)}
           subtitle={
-            stats.overdueCount === 0
-              ? "nothing overdue"
-              : `${stats.overdueCount} overdue`
+            stats.quotationCount === 0
+              ? "no quotations"
+              : `${stats.quotationCount} quotations`
           }
-          icon={AlertCircle}
-          accentColor="#e53e3e"
-          borderColor="#fc8181"
+          icon={FileQuestion}
+          accentColor="#1d4ed8"
+          borderColor="#bfdbfe"
         />
         <StatCard
           label="Total Proforma"
