@@ -34,7 +34,7 @@ export function QuotationTemplatePage1({ invoice }: { invoice: Invoice }) {
   const mode = getQuotationSubjectMode(subject);
   const isBoth = mode === "both";
   const hasAdhesive = mode === "adhesive";
-  const hasBlocks = mode === "blocks";
+  const _hasBlocks = mode === "blocks";
 
   let supplyPriceStr = "";
   if (isBoth) {
