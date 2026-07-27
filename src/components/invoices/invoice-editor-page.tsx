@@ -532,7 +532,7 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
                     <Input
                       id="dispatch-site"
                       value={invoice.dispatchSite ?? ""}
-                      placeholder="Balugaon, Bhubaneswar"
+                      placeholder="Enter dispatch site"
                       onChange={(event) =>
                         updateInvoice((current) => ({
                           ...current,

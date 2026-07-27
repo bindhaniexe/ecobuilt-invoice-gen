@@ -148,9 +148,9 @@ export function DashboardPage() {
       0,
     );
 
-    // Quotation Pipeline (active/pending quotes)
-    const quotationPipeline = quotationInvoices.reduce(
-      (sum, inv) => sum + inv.totals.balanceDue,
+    // Total Proforma
+    const totalProforma = proformaInvoices.reduce(
+      (sum, inv) => sum + inv.totals.grandTotal,
       0,
     );
 
@@ -160,9 +160,9 @@ export function DashboardPage() {
       outstanding,
       overdue,
       overdueCount: overdueInvoices.length,
-      quotationPipeline,
-      quotationCount: quotationInvoices.length,
+      totalProforma,
       proformaCount: proformaInvoices.length,
+      quotationCount: quotationInvoices.length,
     };
   }, [invoices]);
 
@@ -250,15 +250,15 @@ export function DashboardPage() {
           borderColor="#fc8181"
         />
         <StatCard
-          label="Quotation Pipeline"
-          value={formatCurrency(stats.quotationPipeline)}
+          label="Total Proforma"
+          value={formatCurrency(stats.totalProforma)}
           subtitle={
-            stats.quotationCount === 0
-              ? "no active quotations"
-              : `${stats.quotationCount} active quotations`
+            stats.proformaCount === 0
+              ? "no proforma invoices"
+              : `${stats.proformaCount} proforma invoices`
           }
-          icon={FileQuestion}
-          accentColor="#7c3aed"
+          icon={FileText}
+          accentColor="#6b21a8"
           borderColor="#c084fc"
         />
       </section>

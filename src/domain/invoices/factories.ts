@@ -83,7 +83,7 @@ export function createInvoiceDraft(
         : "Payment is due within 15 days from the invoice date.";
 
   const quotationFields = type === "quotation" ? {
-    dispatchSite: "Balugaon, Bhubaneswar",
+    dispatchSite: "",
     quotationSubject: "Quotation of Autoclaved Aerated Concrete (AAC Blocks) & Adhesive.",
     selectedBreadths: ["75", "125", "150", "225", "250"],
     gstBlocks: 12,

@@ -99,7 +99,7 @@ export function QuotationTemplatePage1({ invoice }: { invoice: Invoice }) {
 
         {/* Dispatch Site */}
         <div className="mt-4 text-[12px] font-semibold text-ink">
-          Dispatch Site: <span className="font-normal">{invoice.dispatchSite || "Balugaon, Bhubaneswar"}</span>
+          Dispatch Site: <span className="font-normal">{invoice.dispatchSite || ""}</span>
         </div>
 
         {/* Subject */}
