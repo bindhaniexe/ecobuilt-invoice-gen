@@ -12,7 +12,7 @@ import fs from "fs";
  * See https://github.com/Sparticuz/chromium/releases for available packs.
  */
 const CHROMIUM_PACK_URL =
-  "https://github.com/Sparticuz/chromium/releases/download/v149.0.0/chromium-v149.0.0-pack.tar";
+  "https://github.com/Sparticuz/chromium/releases/download/v149.0.0/chromium-v149.0.0-pack.x64.tar";
 
 function getLocalChromePath(): string | undefined {
   if (process.env.PUPPETEER_EXECUTABLE_PATH) {
