@@ -77,6 +77,44 @@ export async function generateClientSidePdfBlob(
   }
 }
 
+/**
+ * Attempt to generate a PDF via the server-side Puppeteer route.
+ * Retries once on failure (cold-start resilience) before returning null.
+ */
+async function fetchServerPdf(invoice: Invoice, retries = 1): Promise<Blob | null> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const response = await fetch("/api/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(invoice),
+      });
+
+      if (response.ok) {
+        return await response.blob();
+      }
+
+      const err = await response.json().catch(() => ({ error: "Server PDF route error" }));
+      console.warn(
+        `[PDF] Server attempt ${attempt + 1}/${retries + 1} failed (${response.status}):`,
+        err.error
+      );
+    } catch (error) {
+      console.warn(
+        `[PDF] Server attempt ${attempt + 1}/${retries + 1} network error:`,
+        error
+      );
+    }
+
+    // Wait before retrying (skip wait on last attempt)
+    if (attempt < retries) {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+  }
+
+  return null;
+}
+
 export async function downloadInvoicePdf(
   invoice: Invoice,
   filename: string,
@@ -84,24 +122,11 @@ export async function downloadInvoicePdf(
 ): Promise<void> {
   let blob: Blob;
 
-  try {
-    const response = await fetch("/api/pdf", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(invoice),
-    });
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({ error: "Server PDF route error" }));
-      console.warn("Server PDF generation unavailable:", err.error, "Falling back to client PDF.");
-      blob = await generateClientSidePdfBlob(invoice);
-    } else {
-      blob = await response.blob();
-    }
-  } catch (error) {
-    console.warn("Server PDF fetch failed:", error, "Falling back to client PDF.");
+  const serverBlob = await fetchServerPdf(invoice);
+  if (serverBlob) {
+    blob = serverBlob;
+  } else {
+    console.warn("[PDF] All server attempts failed. Falling back to client PDF.");
     blob = await generateClientSidePdfBlob(invoice);
   }
 
@@ -122,24 +147,11 @@ export async function createInvoicePdfFile(
 ): Promise<File> {
   let blob: Blob;
 
-  try {
-    const response = await fetch("/api/pdf", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(invoice),
-    });
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({ error: "Server PDF route error" }));
-      console.warn("Server PDF generation unavailable:", err.error, "Falling back to client PDF.");
-      blob = await generateClientSidePdfBlob(invoice);
-    } else {
-      blob = await response.blob();
-    }
-  } catch (error) {
-    console.warn("Server PDF fetch failed:", error, "Falling back to client PDF.");
+  const serverBlob = await fetchServerPdf(invoice);
+  if (serverBlob) {
+    blob = serverBlob;
+  } else {
+    console.warn("[PDF] All server attempts failed. Falling back to client PDF.");
     blob = await generateClientSidePdfBlob(invoice);
   }
 

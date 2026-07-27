@@ -1,7 +1,18 @@
 import { NextResponse } from "next/server";
 import puppeteer from "puppeteer-core";
-import chromium from "@sparticuz/chromium";
+import chromium from "@sparticuz/chromium-min";
 import fs from "fs";
+
+/**
+ * Chromium binary hosted on GitHub by @Sparticuz/chromium.
+ * @sparticuz/chromium-min downloads this at cold-start instead of bundling it,
+ * which avoids the "input directory does not exist" error with pnpm + Vercel.
+ *
+ * Pin the pack version to match the @sparticuz/chromium-min major version.
+ * See https://github.com/Sparticuz/chromium/releases for available packs.
+ */
+const CHROMIUM_PACK_URL =
+  "https://github.com/Sparticuz/chromium/releases/download/v149.0.0/chromium-v149.0.0-pack.tar";
 
 function getLocalChromePath(): string | undefined {
   if (process.env.PUPPETEER_EXECUTABLE_PATH) {
@@ -56,10 +67,14 @@ export async function POST(request: Request) {
           "--disable-setuid-sandbox",
           "--disable-dev-shm-usage",
         ],
+        defaultViewport: { width: 1200, height: 1600, deviceScaleFactor: 2 },
       });
     } else {
       // Production / Serverless environment (Vercel, AWS, etc.):
-      const executablePath = await chromium.executablePath();
+      // chromium-min downloads the binary from the pack URL at cold-start
+      const executablePath = await chromium.executablePath(CHROMIUM_PACK_URL);
+      console.log("[PDF] Chromium executable resolved:", executablePath);
+
       browser = await puppeteer.launch({
         args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"],
         defaultViewport: { width: 1200, height: 1600, deviceScaleFactor: 2 },
@@ -74,7 +89,7 @@ export async function POST(request: Request) {
     await page.setViewport({ width: 1200, height: 1600, deviceScaleFactor: 2 });
 
     // Navigate to print-preview
-    await page.goto(targetUrl, { waitUntil: "networkidle0", timeout: 20000 });
+    await page.goto(targetUrl, { waitUntil: "networkidle0", timeout: 15000 });
 
     // Wait for the page to be ready
     await page.waitForFunction(() => window.isPrintPreviewReady === true, {
