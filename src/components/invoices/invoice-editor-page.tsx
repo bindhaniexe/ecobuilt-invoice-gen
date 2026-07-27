@@ -29,6 +29,7 @@ import {
 } from "@/domain/invoices/factories";
 import {
   getInvoiceTypeLabel,
+  getQuotationSubjectMode,
   isConvertibleToTaxInvoice,
   parseInvoiceTypeParam,
 } from "@/domain/invoices/document-type";
@@ -111,9 +112,9 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
             setInvoice(
               existingInvoice
                 ? {
-                    ...existingInvoice,
-                    company: defaultCompany,
-                  }
+                  ...existingInvoice,
+                  company: defaultCompany,
+                }
                 : null,
             );
           }
@@ -325,11 +326,11 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
       const phone = saved.customerSnapshot.phone?.replace(/\D/g, "") ?? "";
       const whatsappUrl = phone
         ? `https://wa.me/${phone}?text=${encodeURIComponent(
-            `${shareText}\n\nPDF downloaded — attach ${file.name} in WhatsApp.`,
-          )}`
+          `${shareText}\n\nPDF downloaded — attach ${file.name} in WhatsApp.`,
+        )}`
         : `https://wa.me/?text=${encodeURIComponent(
-            `${shareText}\n\nPDF downloaded — attach ${file.name} in WhatsApp.`,
-          )}`;
+          `${shareText}\n\nPDF downloaded — attach ${file.name} in WhatsApp.`,
+        )}`;
 
       window.open(whatsappUrl, "_blank", "noopener,noreferrer");
       setMessage(
@@ -382,7 +383,7 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
               </Link>
             </Button>
           </div>
-          
+
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
             <div>
               <h1 className="text-[28px] font-bold leading-tight text-ink">
@@ -542,17 +543,36 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
                   </Field>
                   <div className="md:col-span-2">
                     <Field label="Quotation Subject" htmlFor="quotation-subject">
-                      <Input
+                      <Select
                         id="quotation-subject"
-                        value={invoice.quotationSubject ?? ""}
-                        placeholder="Quotation of Autoclaved Aerated Concrete (AAC Blocks) & Adhesive."
+                        value={invoice.quotationSubject || "Quotation of Autoclaved Aerated Concrete (AAC Blocks) & Adhesive."}
                         onChange={(event) =>
                           updateInvoice((current) => ({
                             ...current,
                             quotationSubject: event.target.value,
                           }))
                         }
-                      />
+                      >
+                        <option value="Quotation of Autoclaved Aerated Concrete (AAC Blocks) & Adhesive.">
+                          Autoclaved Aerated Concrete (AAC Blocks) & Adhesive
+                        </option>
+                        <option value="Quotation of Autoclaved Aerated Concrete (AAC Blocks).">
+                          Autoclaved Aerated Concrete (AAC Blocks)
+                        </option>
+                        <option value="Quotation of AAC Block Adhesive.">
+                          Adhesive
+                        </option>
+                        {invoice.quotationSubject &&
+                        ![
+                          "Quotation of Autoclaved Aerated Concrete (AAC Blocks) & Adhesive.",
+                          "Quotation of Autoclaved Aerated Concrete (AAC Blocks).",
+                          "Quotation of AAC Block Adhesive.",
+                        ].includes(invoice.quotationSubject) ? (
+                          <option value={invoice.quotationSubject}>
+                            {invoice.quotationSubject}
+                          </option>
+                        ) : null}
+                      </Select>
                     </Field>
                   </div>
                   <Field label="Contact Person" htmlFor="contact-name">
@@ -655,8 +675,8 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
                   <div>
                     <span className="text-sm font-semibold text-ink block mb-2">Breadth of the size</span>
                     <div className="flex flex-wrap gap-4 p-3 bg-surface-soft border border-hairline rounded-lg">
-                      {["75", "100", "125", "150", "200", "250"].map((b) => {
-                        const currentSelected = invoice.selectedBreadths || ["75", "125", "150", "250"];
+                      {["75", "100", "125", "150", "200", "225", "250"].map((b) => {
+                        const currentSelected = invoice.selectedBreadths || ["75", "125", "150", "225", "250"];
                         return (
                           <label key={b} className="flex items-center gap-2 text-sm text-ink cursor-pointer">
                             <input
@@ -681,115 +701,139 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
                     </div>
                   </div>
 
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <Field label="AAC Blocks Price (Per CUM)" htmlFor="aac-blocks-price">
-                      <Input
-                        id="aac-blocks-price"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={invoice.aacBlocksPrice ?? 3300}
-                        onChange={(event) =>
-                          updateInvoice((current) => ({
-                            ...current,
-                            aacBlocksPrice: Number(event.target.value),
-                          }))
-                        }
-                      />
-                    </Field>
-                    <Field label="Adhesive Price (Per BAG)" htmlFor="adhesive-price">
-                      <Input
-                        id="adhesive-price"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={invoice.adhesivePrice ?? 466.10}
-                        onChange={(event) =>
-                          updateInvoice((current) => ({
-                            ...current,
-                            adhesivePrice: Number(event.target.value),
-                          }))
-                        }
-                      />
-                    </Field>
-                    <Field label="GST on AAC Blocks" htmlFor="gst-blocks">
-                      <Select
-                        id="gst-blocks"
-                        value={invoice.gstBlocks ?? 12}
-                        onChange={(event) =>
-                          updateInvoice((current) => ({
-                            ...current,
-                            gstBlocks: Number(event.target.value),
-                          }))
-                        }
-                      >
-                        <option value="12">12%</option>
-                        <option value="18">18%</option>
-                      </Select>
-                    </Field>
-                    <Field label="GST on Adhesive" htmlFor="gst-adhesive">
-                      <Select
-                        id="gst-adhesive"
-                        value={invoice.gstAdhesive ?? 18}
-                        onChange={(event) =>
-                          updateInvoice((current) => ({
-                            ...current,
-                            gstAdhesive: Number(event.target.value),
-                          }))
-                        }
-                      >
-                        <option value="12">12%</option>
-                        <option value="18">18%</option>
-                      </Select>
-                    </Field>
-                    <Field label="Payment Term (Advance)" htmlFor="payment-percentage">
-                      <Select
-                        id="payment-percentage"
-                        value={invoice.paymentPercentage ?? 100}
-                        onChange={(event) =>
-                          updateInvoice((current) => ({
-                            ...current,
-                            paymentPercentage: Number(event.target.value),
-                          }))
-                        }
-                      >
-                        <option value="20">20%</option>
-                        <option value="40">40%</option>
-                        <option value="60">60%</option>
-                        <option value="80">80%</option>
-                        <option value="100">100%</option>
-                      </Select>
-                    </Field>
-                    <Field label="Transport" htmlFor="transport-scope">
-                      <Select
-                        id="transport-scope"
-                        value={invoice.transportScope ?? "Our Scope"}
-                        onChange={(event) =>
-                          updateInvoice((current) => ({
-                            ...current,
-                            transportScope: event.target.value,
-                          }))
-                        }
-                      >
-                        <option value="Our Scope">Our Scope</option>
-                        <option value="Your Scope">Your Scope</option>
-                      </Select>
-                    </Field>
-                  </div>
+                  {(() => {
+                    const mode = getQuotationSubjectMode(invoice.quotationSubject);
+                    const showBlocks = mode === "both" || mode === "blocks";
+                    const showAdhesive = mode === "both" || mode === "adhesive";
+
+                    return (
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {showBlocks ? (
+                          <Field label="AAC Blocks Price (Per CUM)" htmlFor="aac-blocks-price">
+                            <Input
+                              id="aac-blocks-price"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder="Fill price (e.g. 3300)"
+                              value={invoice.aacBlocksPrice !== undefined && invoice.aacBlocksPrice !== null ? invoice.aacBlocksPrice : ""}
+                              onChange={(event) => {
+                                const val = event.target.value;
+                                updateInvoice((current) => ({
+                                  ...current,
+                                  aacBlocksPrice: val === "" ? undefined : Number(val),
+                                }));
+                              }}
+                            />
+                          </Field>
+                        ) : null}
+
+                        {showAdhesive ? (
+                          <Field label="Adhesive Price (Per BAG)" htmlFor="adhesive-price">
+                            <Input
+                              id="adhesive-price"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder="Fill price (e.g. 466.10)"
+                              value={invoice.adhesivePrice !== undefined && invoice.adhesivePrice !== null ? invoice.adhesivePrice : ""}
+                              onChange={(event) => {
+                                const val = event.target.value;
+                                updateInvoice((current) => ({
+                                  ...current,
+                                  adhesivePrice: val === "" ? undefined : Number(val),
+                                }));
+                              }}
+                            />
+                          </Field>
+                        ) : null}
+
+                        {showBlocks ? (
+                          <Field label="GST on AAC Blocks" htmlFor="gst-blocks">
+                            <Select
+                              id="gst-blocks"
+                              value={invoice.gstBlocks ?? 12}
+                              onChange={(event) =>
+                                updateInvoice((current) => ({
+                                  ...current,
+                                  gstBlocks: Number(event.target.value),
+                                }))
+                              }
+                            >
+                              <option value="12">12%</option>
+                              <option value="18">18%</option>
+                            </Select>
+                          </Field>
+                        ) : null}
+
+                        {showAdhesive ? (
+                          <Field label="GST on Adhesive" htmlFor="gst-adhesive">
+                            <Select
+                              id="gst-adhesive"
+                              value={invoice.gstAdhesive ?? 18}
+                              onChange={(event) =>
+                                updateInvoice((current) => ({
+                                  ...current,
+                                  gstAdhesive: Number(event.target.value),
+                                }))
+                              }
+                            >
+                              <option value="12">12%</option>
+                              <option value="18">18%</option>
+                            </Select>
+                          </Field>
+                        ) : null}
+
+                        <Field label="Payment Terms" htmlFor="payment-terms-text">
+                          <Input
+                            id="payment-terms-text"
+                            placeholder="(e.g. Advance 100%)"
+                            value={invoice.paymentTermsText ?? ""}
+                            onChange={(event) =>
+                              updateInvoice((current) => ({
+                                ...current,
+                                paymentTermsText: event.target.value,
+                              }))
+                            }
+                          />
+                        </Field>
+
+                        <Field label="Unloading" htmlFor="unloading-scope">
+                          <Select
+                            id="unloading-scope"
+                            value={invoice.unloadingScope ?? "Our Scope"}
+                            onChange={(event) =>
+                              updateInvoice((current) => ({
+                                ...current,
+                                unloadingScope: event.target.value,
+                              }))
+                            }
+                          >
+                            <option value="Our Scope">Our Scope</option>
+                            <option value="Your Scope">Your Scope</option>
+                          </Select>
+                        </Field>
+
+                        <Field label="Transport" htmlFor="transport-scope">
+                          <Select
+                            id="transport-scope"
+                            value={invoice.transportScope ?? "Our Scope"}
+                            onChange={(event) =>
+                              updateInvoice((current) => ({
+                                ...current,
+                                transportScope: event.target.value,
+                              }))
+                            }
+                          >
+                            <option value="Our Scope">Our Scope</option>
+                            <option value="Your Scope">Your Scope</option>
+                          </Select>
+                        </Field>
+                      </div>
+                    );
+                  })()}
 
                   <div className="grid gap-4 md:grid-cols-2">
-                    <Field label="Freight Charges" htmlFor="freight-charges-text">
-                      <Textarea
-                        id="freight-charges-text"
-                        value={invoice.freightChargesText ?? ""}
-                        onChange={(event) =>
-                          updateInvoice((current) => ({
-                            ...current,
-                            freightChargesText: event.target.value,
-                          }))
-                        }
-                      />
-                    </Field>
                     <Field label="Delivery Terms" htmlFor="delivery-terms-text">
                       <Textarea
                         id="delivery-terms-text"
@@ -952,7 +996,7 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
                     Locked
                   </span>
                 </div>
-                
+
                 <div className="grid gap-4 md:grid-cols-2 text-sm">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-wider text-muted">Company Name</p>

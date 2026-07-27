@@ -30,3 +30,27 @@ export function parseInvoiceTypeParam(value: string | null | undefined): Invoice
   }
   return "tax-invoice";
 }
+
+export type QuotationSubjectMode = "both" | "blocks" | "adhesive";
+
+export function getQuotationSubjectMode(subjectText?: string): QuotationSubjectMode {
+  if (!subjectText) return "both";
+  const s = subjectText.trim();
+  const lower = s.toLowerCase();
+
+  if (
+    s === "Quotation of AAC Block Adhesive." ||
+    (lower.includes("adhesive") && !lower.includes("autoclaved") && !lower.includes("&") && !lower.includes(" and "))
+  ) {
+    return "adhesive";
+  }
+
+  if (
+    s === "Quotation of Autoclaved Aerated Concrete (AAC Blocks)." ||
+    (lower.includes("autoclaved") && !lower.includes("adhesive"))
+  ) {
+    return "blocks";
+  }
+
+  return "both";
+}

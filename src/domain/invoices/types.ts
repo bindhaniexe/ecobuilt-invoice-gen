@@ -91,7 +91,9 @@ export interface Invoice {
   gstBlocks?: number;
   gstAdhesive?: number;
   paymentPercentage?: number;
+  paymentTermsText?: string;
   transportScope?: string;
+  unloadingScope?: string;
   aacBlocksPrice?: number;
   adhesivePrice?: number;
   freightChargesText?: string;

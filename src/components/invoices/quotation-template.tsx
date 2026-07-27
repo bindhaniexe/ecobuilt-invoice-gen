@@ -2,6 +2,7 @@
 
 import type { RefObject } from "react";
 import type { Invoice } from "@/domain/invoices/types";
+import { getQuotationSubjectMode } from "@/domain/invoices/document-type";
 import { formatDate } from "@/lib/utils";
 
 export function QuotationPreview({
@@ -24,10 +25,48 @@ export function QuotationPreview({
 }
 
 export function QuotationTemplatePage1({ invoice }: { invoice: Invoice }) {
-  const selectedBreadths = invoice.selectedBreadths || ["75", "125", "150", "250"];
+  const selectedBreadths = invoice.selectedBreadths || ["75", "125", "150", "225", "250"];
   const formattedBreadth = selectedBreadths
     .map((b) => b.padStart(3, "0"))
     .join("/") + "MM";
+
+  const subject = invoice.quotationSubject || "Quotation of Autoclaved Aerated Concrete (AAC Blocks) & Adhesive.";
+  const mode = getQuotationSubjectMode(subject);
+  const isBoth = mode === "both";
+  const hasAdhesive = mode === "adhesive";
+  const hasBlocks = mode === "blocks";
+
+  let supplyPriceStr = "";
+  if (isBoth) {
+    const blocksStr = invoice.aacBlocksPrice !== undefined && invoice.aacBlocksPrice !== null && invoice.aacBlocksPrice !== ('' as unknown)
+      ? `Rs. ${invoice.aacBlocksPrice} PER CUM BLOCK`
+      : "Rs. ____ PER CUM BLOCK";
+    const adhesiveStr = invoice.adhesivePrice !== undefined && invoice.adhesivePrice !== null && invoice.adhesivePrice !== ('' as unknown)
+      ? `Rs. ${invoice.adhesivePrice} PER BAG For Adhesive (40 KG)`
+      : "Rs. ____ PER BAG For Adhesive (40 KG)";
+    supplyPriceStr = `${blocksStr} & ${adhesiveStr}`;
+  } else if (hasAdhesive) {
+    supplyPriceStr = invoice.adhesivePrice !== undefined && invoice.adhesivePrice !== null && invoice.adhesivePrice !== ('' as unknown)
+      ? `Rs. ${invoice.adhesivePrice} PER BAG For Adhesive (40 KG)`
+      : "Rs. ____ PER BAG For Adhesive (40 KG)";
+  } else {
+    supplyPriceStr = invoice.aacBlocksPrice !== undefined && invoice.aacBlocksPrice !== null && invoice.aacBlocksPrice !== ('' as unknown)
+      ? `Rs. ${invoice.aacBlocksPrice} PER CUM BLOCK`
+      : "Rs. ____ PER CUM BLOCK";
+  }
+
+  let extraGstStr = "";
+  if (isBoth) {
+    extraGstStr = `@ ${invoice.gstBlocks ?? 12}% on AAC Blocks & @ ${invoice.gstAdhesive ?? 18}% on Adhesive on the above price respectively.`;
+  } else if (hasAdhesive) {
+    extraGstStr = `@ ${invoice.gstAdhesive ?? 18}% on Adhesive on the above price.`;
+  } else {
+    extraGstStr = `@ ${invoice.gstBlocks ?? 12}% on AAC Blocks on the above price.`;
+  }
+
+  const paymentText = invoice.paymentTermsText !== undefined
+    ? invoice.paymentTermsText
+    : (invoice.paymentPercentage ? `Advance ${invoice.paymentPercentage}%` : "");
 
   return (
     <article className="invoice-page shadow-airbnb">
@@ -65,7 +104,7 @@ export function QuotationTemplatePage1({ invoice }: { invoice: Invoice }) {
 
         {/* Subject */}
         <div className="mt-3 text-[12px] font-bold text-ink border-y border-hairline py-2">
-          Sub: {invoice.quotationSubject || "Quotation of Autoclaved Aerated Concrete (AAC Blocks) & Adhesive."}
+          Sub: {subject}
         </div>
 
         {/* Salutation */}
@@ -82,8 +121,20 @@ export function QuotationTemplatePage1({ invoice }: { invoice: Invoice }) {
             <div className="font-semibold text-right">1.</div>
             <div>
               <span className="font-semibold">Item:</span>
-              <div className="mt-0.5 pl-4">(a) Autoclaved Aerated Concrete (AAC Blocks), as per IS:2185(Part-III)</div>
-              <div className="pl-4">(b) Masonry work is governed by IS 6041.</div>
+              {isBoth ? (
+                <>
+                  <div className="mt-0.5 pl-4">(a) Autoclaved Aerated Concrete (AAC Blocks), as per IS:2185(Part-III)</div>
+                  <div className="pl-4">(b) AAC Block Adhesive</div>
+                  <div className="pl-4">(c) Masonry work is governed by IS 6041.</div>
+                </>
+              ) : hasAdhesive ? (
+                <div className="mt-0.5 pl-4">(a) AAC Block Adhesive</div>
+              ) : (
+                <>
+                  <div className="mt-0.5 pl-4">(a) Autoclaved Aerated Concrete (AAC Blocks), as per IS:2185(Part-III)</div>
+                  <div className="pl-4">(b) Masonry work is governed by IS 6041.</div>
+                </>
+              )}
             </div>
           </div>
 
@@ -109,7 +160,7 @@ export function QuotationTemplatePage1({ invoice }: { invoice: Invoice }) {
             <div>
               <span className="font-semibold">Supply Price:</span>
               <span className="ml-2 font-medium">
-                Rs. {invoice.aacBlocksPrice ?? 3300} PER CUM BLOCK & Rs. {invoice.adhesivePrice ?? 466.10} PER BAG For Adhesive (40 KG)
+                {supplyPriceStr}
               </span>
             </div>
           </div>
@@ -119,7 +170,7 @@ export function QuotationTemplatePage1({ invoice }: { invoice: Invoice }) {
             <div>
               <span className="font-semibold">Extra GST:</span>
               <span className="ml-2 font-medium">
-                @ {invoice.gstBlocks ?? 12}% on AAC Blocks & @ {invoice.gstAdhesive ?? 18}% on Adhesive on the above price respectively.
+                {extraGstStr}
               </span>
             </div>
           </div>
@@ -129,7 +180,7 @@ export function QuotationTemplatePage1({ invoice }: { invoice: Invoice }) {
             <div>
               <span className="font-semibold">Payment:</span>
               <span className="ml-2 font-medium">
-                Advance {invoice.paymentPercentage ?? 100}%
+                {paymentText}
               </span>
             </div>
           </div>
@@ -137,8 +188,8 @@ export function QuotationTemplatePage1({ invoice }: { invoice: Invoice }) {
           <div className="grid grid-cols-[24px_1fr] gap-2">
             <div className="font-semibold text-right">6.</div>
             <div>
-              <span className="font-semibold">Freight Charges:</span>
-              <span className="ml-2 font-medium whitespace-pre-line">{invoice.freightChargesText}</span>
+              <span className="font-semibold">Unloading:</span>
+              <span className="ml-2 font-medium">{invoice.unloadingScope ?? "Our Scope"}.</span>
             </div>
           </div>
 
