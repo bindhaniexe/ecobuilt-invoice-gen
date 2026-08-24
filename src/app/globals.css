@@ -2,6 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================
+   Self-hosted Inter – includes ₹ (U+20B9)
+   font-display: block prevents Chromium from
+   snapshotting a fallback font that lacks the
+   Rupee glyph when rendering PDFs headlessly.
+   ============================================ */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('/fonts/inter-400.woff2') format('woff2'),
+       url('/fonts/inter-400.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: block;
+  src: url('/fonts/inter-500.woff2') format('woff2'),
+       url('/fonts/inter-500.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: block;
+  src: url('/fonts/inter-600.woff2') format('woff2'),
+       url('/fonts/inter-600.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url('/fonts/inter-700.ttf') format('truetype');
+}
+
 :root {
   color-scheme: light;
   --canvas: #ffffff;

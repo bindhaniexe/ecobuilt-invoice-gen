@@ -18,7 +18,7 @@ export type SyncResult =
   | { status: "error"; message: string };
 
 /** Records with a matching id, keeping whichever has the newer updatedAt. */
-function mergeById<T extends { id: string; updatedAt: string }>(
+function mergeById<T extends { id: string; updatedAt: string; deletedAt?: string }>(
   local: T[],
   remote: T[],
 ): { merged: T[]; changed: boolean } {
@@ -27,13 +27,22 @@ function mergeById<T extends { id: string; updatedAt: string }>(
 
   for (const incoming of remote) {
     const current = byId.get(incoming.id);
-    if (
-      !current ||
-      new Date(incoming.updatedAt).getTime() >
-        new Date(current.updatedAt).getTime()
-    ) {
+    if (!current) {
       byId.set(incoming.id, incoming);
       changed = true;
+    } else {
+      const incomingTime = new Date(incoming.updatedAt).getTime();
+      const currentTime = new Date(current.updatedAt).getTime();
+
+      if (incomingTime > currentTime) {
+        byId.set(incoming.id, incoming);
+        changed = true;
+      } else if (incomingTime === currentTime) {
+        if (incoming.deletedAt && !current.deletedAt) {
+          byId.set(incoming.id, incoming);
+          changed = true;
+        }
+      }
     }
   }
 

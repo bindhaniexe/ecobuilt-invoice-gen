@@ -75,7 +75,7 @@ export async function POST(request: Request) {
           deletedAt: sql`excluded.deleted_at`,
           serverUpdatedAt: sql`clock_timestamp()`,
         },
-        setWhere: sql`${customers.updatedAt} < excluded.updated_at`,
+        setWhere: sql`${customers.updatedAt} <= excluded.updated_at`,
       });
   }
 
@@ -98,7 +98,7 @@ export async function POST(request: Request) {
           deletedAt: sql`excluded.deleted_at`,
           serverUpdatedAt: sql`clock_timestamp()`,
         },
-        setWhere: sql`${invoices.updatedAt} < excluded.updated_at`,
+        setWhere: sql`${invoices.updatedAt} <= excluded.updated_at`,
       });
   }
 

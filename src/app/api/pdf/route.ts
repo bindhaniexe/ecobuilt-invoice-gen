@@ -54,6 +54,9 @@ export async function POST(request: Request) {
     const baseUrl = `${protocol}://${host}`;
     const targetUrl = `${baseUrl}/print-preview`;
 
+    // Forward the session cookie so Puppeteer can authenticate
+    const sessionCookie = request.headers.get("cookie") ?? "";
+
     const isLocalDev = process.env.NODE_ENV === "development";
     const localExecutablePath = getLocalChromePath();
 
@@ -85,11 +88,16 @@ export async function POST(request: Request) {
 
     const page = await browser.newPage();
 
+    // Forward session cookie so the renderer can access authenticated endpoints
+    if (sessionCookie) {
+      await page.setExtraHTTPHeaders({ cookie: sessionCookie });
+    }
+
     // Set viewport size
     await page.setViewport({ width: 1200, height: 1600, deviceScaleFactor: 2 });
 
     // Navigate to print-preview
-    await page.goto(targetUrl, { waitUntil: "networkidle0", timeout: 15000 });
+    await page.goto(targetUrl, { waitUntil: "networkidle0", timeout: 20000 });
 
     // Wait for the page to be ready
     await page.waitForFunction(() => window.isPrintPreviewReady === true, {
@@ -104,8 +112,41 @@ export async function POST(request: Request) {
     // Wait for the .print-area selector to be rendered
     await page.waitForSelector(".print-area", { timeout: 10000 });
 
-    // Give it a tiny bit of time to make sure any webfonts are fully drawn
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    /**
+     * Wait until Inter has actually loaded the ₹ glyph (U+20B9).
+     *
+     * Strategy: measure the width of '₹' rendered with Inter vs. a
+     * monospace-only fallback. Once they differ, Inter is active and
+     * the glyph exists. We retry for up to 5 s before proceeding anyway.
+     */
+    await page.evaluate(() => {
+      return new Promise<void>((resolve) => {
+        const MAX_WAIT = 5000;
+        const start = Date.now();
+
+        function check() {
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d")!;
+
+          // Measure ₹ in Inter (our self-hosted font)
+          ctx.font = "16px Inter";
+          const interWidth = ctx.measureText("\u20B9").width;
+
+          // Measure ₹ in a monospace fallback that definitely lacks ₹
+          ctx.font = "16px monospace";
+          const monoWidth = ctx.measureText("\u20B9").width;
+
+          // When Inter is loaded its glyph width will differ from monospace
+          if (interWidth !== monoWidth || Date.now() - start > MAX_WAIT) {
+            resolve();
+          } else {
+            requestAnimationFrame(check);
+          }
+        }
+
+        check();
+      });
+    });
 
     // Generate PDF
     const pdfBuffer = await page.pdf({

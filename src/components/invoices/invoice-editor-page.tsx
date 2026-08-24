@@ -1131,7 +1131,7 @@ export function InvoiceEditorPage({ invoiceId }: { invoiceId?: string }) {
                       ...current,
                       items:
                         current.items.length === 1
-                          ? current.items
+                          ? [createInvoiceItem()]
                           : current.items.filter((item) => item.id !== itemId),
                     }))
                   }

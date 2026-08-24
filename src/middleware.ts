@@ -20,9 +20,13 @@ export function middleware(request: NextRequest) {
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
+    pathname.startsWith("/fonts") ||
     pathname.endsWith(".svg") ||
     pathname.endsWith(".png") ||
-    pathname.endsWith(".ico")
+    pathname.endsWith(".ico") ||
+    pathname.endsWith(".woff2") ||
+    pathname.endsWith(".woff") ||
+    pathname.endsWith(".ttf")
   ) {
     return NextResponse.next();
   }
