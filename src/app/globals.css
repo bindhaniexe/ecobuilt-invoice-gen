@@ -3,18 +3,27 @@
 @tailwind utilities;
 
 /* ============================================
-   Self-hosted Inter – includes ₹ (U+20B9)
+   Self-hosted Inter – full Unicode build.
+   Includes ₹ (U+20B9) in every weight.
+
+   IMPORTANT: Only TTF files are referenced.
+   The woff2 files from Google Fonts are Latin-
+   only subsets (~23 KB) that exclude ₹. If
+   woff2 were listed first, Chromium would pick
+   it and silently drop the Rupee glyph for
+   weights 400–600. The TTF files are the full
+   Inter build (~318 KB) that covers all glyphs.
+
    font-display: block prevents Chromium from
-   snapshotting a fallback font that lacks the
-   Rupee glyph when rendering PDFs headlessly.
+   snapshotting a fallback font that lacks ₹
+   when rendering PDFs headlessly.
    ============================================ */
 @font-face {
   font-family: 'Inter';
   font-style: normal;
   font-weight: 400;
   font-display: block;
-  src: url('/fonts/inter-400.woff2') format('woff2'),
-       url('/fonts/inter-400.ttf') format('truetype');
+  src: url('/fonts/inter-400.ttf') format('truetype');
 }
 
 @font-face {
@@ -22,8 +31,7 @@
   font-style: normal;
   font-weight: 500;
   font-display: block;
-  src: url('/fonts/inter-500.woff2') format('woff2'),
-       url('/fonts/inter-500.ttf') format('truetype');
+  src: url('/fonts/inter-500.ttf') format('truetype');
 }
 
 @font-face {
@@ -31,8 +39,7 @@
   font-style: normal;
   font-weight: 600;
   font-display: block;
-  src: url('/fonts/inter-600.woff2') format('woff2'),
-       url('/fonts/inter-600.ttf') format('truetype');
+  src: url('/fonts/inter-600.ttf') format('truetype');
 }
 
 @font-face {
