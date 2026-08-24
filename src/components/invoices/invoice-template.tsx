@@ -182,7 +182,7 @@ export function InvoiceTemplate({
         </section>
 
         {isLastPage ? (
-          <footer className="mt-8 grid grid-cols-[1fr_72mm] gap-8">
+          <footer className="mt-auto grid grid-cols-[1fr_72mm] gap-8 pt-6">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted">
                 Amount in words
@@ -217,7 +217,7 @@ export function InvoiceTemplate({
               </div>
             </div>
 
-            <div>
+            <div className="flex flex-col justify-between">
               <div
                 className="p-4 text-[12px]"
                 style={{ border: "1px solid #dddddd", borderRadius: "14px" }}
@@ -241,7 +241,7 @@ export function InvoiceTemplate({
                 </div>
               </div>
 
-              <div className="mt-8 text-right">
+              <div className="mt-auto pt-6 text-right">
                 {invoice.sealUrl ? (
                   <div className="ml-auto mb-4 flex h-16 w-32 items-center justify-center">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -252,7 +252,7 @@ export function InvoiceTemplate({
                     />
                   </div>
                 ) : null}
-                <div className="ml-auto mt-8 h-px w-40 bg-ink" />
+                <div className="ml-auto h-px w-40 bg-ink" />
                 <p className="mt-2 text-[11px] font-semibold text-ink">
                   {invoice.signature || defaultCompany.name}
                 </p>
